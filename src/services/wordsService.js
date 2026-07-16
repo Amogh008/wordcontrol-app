@@ -1,0 +1,15 @@
+import { apiClient } from './apiClient';
+
+export async function getWords() {
+  const { data } = await apiClient.get('/');
+  return data;
+}
+
+export async function addWord(word) {
+  const { data } = await apiClient.post('/', word);
+  return data;
+}
+
+export async function deleteWord(id) {
+  await apiClient.delete(`/${id}`);
+}
