@@ -13,3 +13,8 @@ export async function addWord(word) {
 export async function deleteWord(id) {
   await apiClient.delete(`/${id}`);
 }
+
+export async function autofillWord({ wort, artikel = '' }) {
+  const { data } = await apiClient.post('/autofill', { wort, artikel });
+  return data;
+}

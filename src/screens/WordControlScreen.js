@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, articles, selectableArticles } from '../theme/colors';
-import { addWord, deleteWord, getWords } from '../services/wordsService';
+import { addWord, autofillWord, deleteWord, getWords } from '../services/wordsService';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
@@ -53,6 +53,7 @@ export default function WordControlScreen() {
   const [bedeutung, setBedeutung] = useState('');
   const [notizen, setNotizen] = useState('');
   const [saving, setSaving] = useState(false);
+  const [filling, setFilling] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,6 +127,23 @@ export default function WordControlScreen() {
     setWort('');
     setBedeutung('');
     setNotizen('');
+  };
+
+  const handleAutofill = async () => {
+    if (wort.trim() === '' || filling) return;
+    setFilling(true);
+    try {
+      const suggestion = await autofillWord({ wort: wort.trim(), artikel });
+      if (!artikel && suggestion.artikel) setArtikel(suggestion.artikel);
+      if (suggestion.bedeutung) setBedeutung(suggestion.bedeutung);
+      if (suggestion.notizen) setNotizen(suggestion.notizen);
+    } catch (err) {
+      const msg =
+        err.response?.data?.error ?? err.message ?? 'Could not autofill this word.';
+      Alert.alert('Autofill fehlgeschlagen', msg);
+    } finally {
+      setFilling(false);
+    }
   };
 
   const handleSave = async () => {
@@ -235,6 +253,17 @@ export default function WordControlScreen() {
                 />
               </View>
             </View>
+
+            <Pressable
+              style={[styles.autofillButton, (wort.trim() === '' || filling) && styles.autofillButtonDisabled]}
+              onPress={handleAutofill}
+              disabled={wort.trim() === '' || filling}
+            >
+              <Ionicons name="sparkles" size={15} color={colors.misc.text} />
+              <Text style={styles.autofillButtonText}>
+                {filling ? 'Fülle aus…' : 'Auto-fill mit KI'}
+              </Text>
+            </Pressable>
 
             {wortMatches.length > 0 ? (
               <View style={styles.matchPanel}>
@@ -712,6 +741,27 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#fff',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  autofillButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.misc.bg,
+    borderWidth: 1,
+    borderColor: colors.misc.text,
+    borderRadius: 10,
+    paddingVertical: 11,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  autofillButtonDisabled: {
+    opacity: 0.5,
+  },
+  autofillButtonText: {
+    color: colors.misc.text,
+    fontSize: 14,
     fontWeight: '700',
   },
   matchPanel: {
