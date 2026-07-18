@@ -208,7 +208,10 @@ export default function WordControlScreen() {
           style={[styles.tabButton, mode === 'add' ? styles.tabButtonActive : styles.tabButtonInactive]}
           onPress={() => setMode('add')}
         >
-          <Text style={[styles.tabButtonText, mode === 'add' && styles.tabButtonTextActive]}>
+          <Text
+            numberOfLines={1}
+            style={[styles.tabButtonText, mode === 'add' && styles.tabButtonTextActive]}
+          >
             + Neues Wort
           </Text>
         </Pressable>
@@ -216,7 +219,10 @@ export default function WordControlScreen() {
           style={[styles.tabButton, mode === 'list' ? styles.tabButtonActive : styles.tabButtonInactive]}
           onPress={() => setMode('list')}
         >
-          <Text style={[styles.tabButtonText, mode === 'list' && styles.tabButtonTextActive]}>
+          <Text
+            numberOfLines={1}
+            style={[styles.tabButtonText, mode === 'list' && styles.tabButtonTextActive]}
+          >
             Wörterbuch <Text style={styles.tabBadge}>{words.length}</Text>
           </Text>
         </Pressable>
