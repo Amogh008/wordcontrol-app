@@ -18,3 +18,13 @@ export async function autofillWord({ wort, artikel = '' }) {
   const { data } = await apiClient.post('/autofill', { wort, artikel });
   return data;
 }
+
+export async function translateText({ text, from, to }) {
+  const { data } = await apiClient.post('/translate', { text, from, to });
+  return data;
+}
+
+export async function checkGrammar({ sentence }) {
+  const { data } = await apiClient.post('/grammar', { sentence });
+  return data;
+}

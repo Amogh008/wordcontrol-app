@@ -7,8 +7,10 @@ function TabItem({ icon, label, active, onPress }) {
   const tint = active ? colors.textDark : colors.textMuted;
   return (
     <Pressable style={styles.item} onPress={onPress} hitSlop={6}>
-      <Ionicons name={active ? icon : `${icon}-outline`} size={24} color={tint} />
-      <Text style={[styles.label, { color: tint, fontWeight: active ? '800' : '600' }]}>{label}</Text>
+      <Ionicons name={active ? icon : `${icon}-outline`} size={22} color={tint} />
+      <Text numberOfLines={1} style={[styles.label, { color: tint, fontWeight: active ? '800' : '600' }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -22,6 +24,18 @@ export default function BottomBar({ tab, onChange }) {
         label="Wörterbuch"
         active={tab === 'words'}
         onPress={() => onChange('words')}
+      />
+      <TabItem
+        icon="language"
+        label="Übersetzer"
+        active={tab === 'translate'}
+        onPress={() => onChange('translate')}
+      />
+      <TabItem
+        icon="school"
+        label="Grammatik"
+        active={tab === 'grammar'}
+        onPress={() => onChange('grammar')}
       />
       <TabItem
         icon="game-controller"
@@ -48,6 +62,6 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   label: {
-    fontSize: 11,
+    fontSize: 10,
   },
 });

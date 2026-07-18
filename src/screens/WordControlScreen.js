@@ -158,7 +158,7 @@ export default function WordControlScreen() {
       });
       resetForm();
       await load();
-      setMode('list');
+      // Stay on the "Neues Wort" tab with a cleared form, ready for the next word.
     } catch (err) {
       Alert.alert('Fehler', err.message ?? 'Failed to save word.');
     } finally {

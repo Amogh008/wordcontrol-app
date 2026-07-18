@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import WordControlScreen from './src/screens/WordControlScreen';
+import TranslationScreen from './src/screens/TranslationScreen';
+import GrammarScreen from './src/screens/GrammarScreen';
 import GamesScreen from './src/screens/GamesScreen';
 import BottomBar from './src/components/BottomBar';
 
@@ -16,6 +18,12 @@ export default function App() {
             switch tabs; the inactive one is just hidden. */}
         <View style={{ flex: 1, display: tab === 'words' ? 'flex' : 'none' }}>
           <WordControlScreen />
+        </View>
+        <View style={{ flex: 1, display: tab === 'translate' ? 'flex' : 'none' }}>
+          <TranslationScreen />
+        </View>
+        <View style={{ flex: 1, display: tab === 'grammar' ? 'flex' : 'none' }}>
+          <GrammarScreen />
         </View>
         <View style={{ flex: 1, display: tab === 'games' ? 'flex' : 'none' }}>
           <GamesScreen active={tab === 'games'} />
