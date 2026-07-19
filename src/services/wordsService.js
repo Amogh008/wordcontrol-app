@@ -10,6 +10,11 @@ export async function addWord(word) {
   return data;
 }
 
+export async function updateWord(id, word) {
+  const { data } = await apiClient.put(`/${id}`, word);
+  return data;
+}
+
 export async function deleteWord(id) {
   await apiClient.delete(`/${id}`);
 }

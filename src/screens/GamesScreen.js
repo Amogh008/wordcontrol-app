@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import { getWords } from '../services/wordsService';
 import GamesView from '../components/GamesView';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
 export default function GamesScreen({ active }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [words, setWords] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,7 +51,7 @@ export default function GamesScreen({ active }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.pageBg,

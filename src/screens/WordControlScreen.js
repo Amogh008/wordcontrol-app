@@ -13,12 +13,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, articles, selectableArticles } from '../theme/colors';
-import { addWord, autofillWord, deleteWord, getWords } from '../services/wordsService';
+import { articles, selectableArticles } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
+import { addWord, autofillWord, deleteWord, getWords, updateWord } from '../services/wordsService';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
-function articleStyle(article) {
+function articleStyle(colors, article) {
   return colors[article] ?? colors.misc;
 }
 
@@ -27,6 +28,9 @@ function bucketFor(article) {
 }
 
 function AlphabetIndex({ letters, onSelect }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   if (letters.length === 0) return null;
 
   return (
@@ -41,6 +45,8 @@ function AlphabetIndex({ letters, onSelect }) {
 }
 
 export default function WordControlScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [mode, setMode] = useState('list');
   const [words, setWords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +60,7 @@ export default function WordControlScreen() {
   const [notizen, setNotizen] = useState('');
   const [saving, setSaving] = useState(false);
   const [filling, setFilling] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -127,6 +134,7 @@ export default function WordControlScreen() {
     setWort('');
     setBedeutung('');
     setNotizen('');
+    setEditingId(null);
   };
 
   const handleAutofill = async () => {
@@ -150,20 +158,38 @@ export default function WordControlScreen() {
     if (!canSave || saving) return;
     setSaving(true);
     try {
-      await addWord({
+      const payload = {
         artikel,
         wort: wort.trim(),
         bedeutung: bedeutung.trim(),
         notizen: notizen.trim(),
-      });
-      resetForm();
-      await load();
-      // Stay on the "Neues Wort" tab with a cleared form, ready for the next word.
+      };
+      if (editingId) {
+        await updateWord(editingId, payload);
+        resetForm();
+        await load();
+        setMode('list');
+      } else {
+        await addWord(payload);
+        resetForm();
+        await load();
+        // Stay on the "Neues Wort" tab with a cleared form, ready for the next word.
+      }
     } catch (err) {
       Alert.alert('Fehler', err.message ?? 'Failed to save word.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleEdit = (word) => {
+    setEditingId(word.id ?? word._id);
+    setArtikel(word.artikel ?? '');
+    setWort(word.wort ?? '');
+    setBedeutung(word.bedeutung ?? '');
+    setNotizen(word.notizen ?? '');
+    setDetailWord(null);
+    setMode('add');
   };
 
   const handleDelete = (id, onDeleted) => {
@@ -212,12 +238,15 @@ export default function WordControlScreen() {
             numberOfLines={1}
             style={[styles.tabButtonText, mode === 'add' && styles.tabButtonTextActive]}
           >
-            + Neues Wort
+            {editingId ? 'Wort bearbeiten' : '+ Neues Wort'}
           </Text>
         </Pressable>
         <Pressable
           style={[styles.tabButton, mode === 'list' ? styles.tabButtonActive : styles.tabButtonInactive]}
-          onPress={() => setMode('list')}
+          onPress={() => {
+            if (editingId) resetForm();
+            setMode('list');
+          }}
         >
           <Text
             numberOfLines={1}
@@ -231,6 +260,23 @@ export default function WordControlScreen() {
       {mode === 'add' ? (
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.formCard}>
+            <View style={styles.actionRow}>
+              <Pressable
+                style={[styles.saveButton, canSave ? styles.saveButtonActive : styles.saveButtonDisabled]}
+                onPress={handleSave}
+                disabled={!canSave || saving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {saving ? 'Speichern…' : editingId ? 'Änderungen speichern' : 'Wort speichern'}
+                </Text>
+              </Pressable>
+
+              <Pressable style={styles.clearButton} onPress={resetForm}>
+                <Ionicons name="trash-outline" size={16} color={colors.textDark} />
+                <Text style={styles.clearButtonText}>Clear All</Text>
+              </Pressable>
+            </View>
+
             <View style={styles.formRow}>
               <View style={{ flex: 0.35, marginRight: 12 }}>
                 <Text style={styles.label}>ARTIKEL</Text>
@@ -278,7 +324,7 @@ export default function WordControlScreen() {
                 </Text>
                 {wortMatches.map((w) => (
                   <View key={w.id ?? w._id} style={styles.matchRow}>
-                    <Text style={[styles.matchArtikel, { color: articleStyle(bucketFor(w.artikel)).text }]}>
+                    <Text style={[styles.matchArtikel, { color: articleStyle(colors, bucketFor(w.artikel)).text }]}>
                       {w.artikel || '—'}
                     </Text>
                     <Text style={styles.matchWort} numberOfLines={1}>
@@ -311,14 +357,6 @@ export default function WordControlScreen() {
               multiline
               numberOfLines={4}
             />
-
-            <Pressable
-              style={[styles.saveButton, canSave ? styles.saveButtonActive : styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={!canSave || saving}
-            >
-              <Text style={styles.saveButtonText}>{saving ? 'Speichern…' : 'Wort speichern'}</Text>
-            </Pressable>
           </View>
         </ScrollView>
       ) : (
@@ -339,7 +377,7 @@ export default function WordControlScreen() {
           >
             {['Alle', ...articles].map((key) => {
               const active = filter === key;
-              const style = key === 'Alle' ? null : articleStyle(key);
+              const style = key === 'Alle' ? null : articleStyle(colors, key);
               return (
                 <Pressable
                   key={key}
@@ -348,7 +386,7 @@ export default function WordControlScreen() {
                     styles.filterPill,
                     active
                       ? { backgroundColor: colors.activePill }
-                      : { backgroundColor: style ? style.bg : '#efe9db' },
+                      : { backgroundColor: style ? style.bg : colors.border },
                   ]}
                 >
                   <Text
@@ -389,7 +427,7 @@ export default function WordControlScreen() {
                     </View>
                     {section.data.map((item) => {
                       const bucket = bucketFor(item.artikel);
-                      const style = articleStyle(bucket);
+                      const style = articleStyle(colors, bucket);
                       return (
                         <Pressable
                           key={item.id ?? item._id}
@@ -430,18 +468,25 @@ export default function WordControlScreen() {
                     style={[
                       styles.modalWord,
                       bucketFor(detailWord.artikel) !== 'misc' && {
-                        color: articleStyle(bucketFor(detailWord.artikel)).text,
+                        color: articleStyle(colors, bucketFor(detailWord.artikel)).text,
                       },
                     ]}
                   >
                     {detailWord.artikel ? `${detailWord.artikel} ${detailWord.wort}` : detailWord.wort}
                   </Text>
                   <Pressable
+                    onPress={() => handleEdit(detailWord)}
+                    hitSlop={10}
+                    style={{ marginLeft: 20 }}
+                  >
+                    <Ionicons name="pencil" size={20} color={colors.misc.text} />
+                  </Pressable>
+                  <Pressable
                     onPress={() =>
                       handleDelete(detailWord.id ?? detailWord._id, () => setDetailWord(null))
                     }
                     hitSlop={10}
-                    style={{ marginLeft: 20 }}
+                    style={{ marginLeft: 16 }}
                   >
                     <Ionicons name="trash" size={22} color={colors.die.text} />
                   </Pressable>
@@ -465,7 +510,7 @@ export default function WordControlScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.pageBg,
@@ -731,11 +776,16 @@ const styles = StyleSheet.create({
     minHeight: 90,
     textAlignVertical: 'top',
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 18,
+  },
   saveButton: {
+    flex: 1,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 4,
   },
   saveButtonActive: {
     backgroundColor: colors.headerBg,
@@ -746,6 +796,23 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  clearButtonText: {
+    color: colors.textDark,
     fontSize: 15,
     fontWeight: '700',
   },

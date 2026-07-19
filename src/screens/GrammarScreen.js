@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import { checkGrammar } from '../services/wordsService';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
@@ -20,6 +20,8 @@ const GOOD = { text: '#2f9e44', bg: '#d3f9d8', border: '#2f9e44' };
 const WARN = { text: '#c2255c', bg: '#ffdeeb', border: '#c2255c' };
 
 export default function GrammarScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [sentence, setSentence] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -42,6 +44,11 @@ export default function GrammarScreen() {
   const canCheck = sentence.trim() !== '' && !loading;
   const showCorrection = result && !result.correct && result.corrected && result.corrected !== sentence.trim();
 
+  const reset = () => {
+    setSentence('');
+    setResult(null);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
@@ -63,14 +70,21 @@ export default function GrammarScreen() {
           multiline
         />
 
-        <Pressable
-          style={[styles.checkButton, !canCheck && styles.checkButtonDisabled]}
-          onPress={handleCheck}
-          disabled={!canCheck}
-        >
-          <Ionicons name="checkmark-done" size={16} color="#fff" />
-          <Text style={styles.checkButtonText}>{loading ? 'Prüft…' : 'Prüfen'}</Text>
-        </Pressable>
+        <View style={styles.actionRow}>
+          <Pressable
+            style={[styles.checkButton, !canCheck && styles.checkButtonDisabled]}
+            onPress={handleCheck}
+            disabled={!canCheck}
+          >
+            <Ionicons name="checkmark-done" size={16} color="#fff" />
+            <Text style={styles.checkButtonText}>{loading ? 'Prüft…' : 'Prüfen'}</Text>
+          </Pressable>
+
+          <Pressable style={styles.clearButton} onPress={reset}>
+            <Ionicons name="trash-outline" size={16} color={colors.textDark} />
+            <Text style={styles.clearButtonText}>Clear All</Text>
+          </Pressable>
+        </View>
 
         {result ? (
           <View>
@@ -114,7 +128,7 @@ export default function GrammarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.pageBg,
@@ -172,7 +186,13 @@ const styles = StyleSheet.create({
     minHeight: 110,
     textAlignVertical: 'top',
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 22,
+  },
   checkButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -180,13 +200,29 @@ const styles = StyleSheet.create({
     backgroundColor: colors.headerBg,
     borderRadius: 10,
     paddingVertical: 14,
-    marginBottom: 22,
   },
   checkButtonDisabled: {
     backgroundColor: colors.disabledButton,
   },
   checkButtonText: {
     color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  clearButtonText: {
+    color: colors.textDark,
     fontSize: 15,
     fontWeight: '700',
   },

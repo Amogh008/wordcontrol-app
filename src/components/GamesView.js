@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, selectableArticles } from '../theme/colors';
+import { selectableArticles } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 const GOOD = { text: '#2f9e44', bg: '#d3f9d8', border: '#2f9e44' };
 const BAD = { text: '#c92a2a', bg: '#ffe3e3', border: '#c92a2a' };
@@ -20,6 +21,8 @@ function isNoun(w) {
 }
 
 function Scoreboard({ score, answered, onExit }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.scoreRow}>
       <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
@@ -34,6 +37,8 @@ function Scoreboard({ score, answered, onExit }) {
 }
 
 function EmptyState({ message, onExit }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyText}>{message}</Text>
@@ -45,6 +50,8 @@ function EmptyState({ message, onExit }) {
 }
 
 function MeaningGame({ words, onExit }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const pool = useMemo(() => words.filter((w) => w.wort && w.bedeutung), [words]);
   const [round, setRound] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -145,6 +152,8 @@ function MeaningGame({ words, onExit }) {
 }
 
 function ArtikelGame({ words, onExit }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const pool = useMemo(() => words.filter(isNoun), [words]);
   const [round, setRound] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -239,6 +248,8 @@ function ArtikelGame({ words, onExit }) {
 }
 
 export default function GamesView({ words }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [game, setGame] = useState(null);
 
   if (game === 'meaning') return <MeaningGame words={words} onExit={() => setGame(null)} />;
@@ -271,7 +282,7 @@ export default function GamesView({ words }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   menu: {
     paddingTop: 8,
     paddingBottom: 24,
