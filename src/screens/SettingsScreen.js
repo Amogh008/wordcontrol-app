@@ -18,6 +18,13 @@ export default function SettingsScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      // react-native-web's Alert.alert is a no-op; window.confirm is the web equivalent.
+      if (window.confirm('Are you sure you want to log out?')) {
+        logout();
+      }
+      return;
+    }
     Alert.alert('Log out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log out', style: 'destructive', onPress: logout },
