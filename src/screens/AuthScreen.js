@@ -14,6 +14,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { isGoogleConfigured, useGoogleIdTokenRequest } from '../services/googleAuth';
+import OutlinedButton from '../components/OutlinedButton';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -100,19 +101,14 @@ export default function AuthScreen() {
           autoCapitalize="none"
         />
 
-        <Pressable
-          style={[styles.primaryButton, submitting && styles.disabledButton]}
+        <OutlinedButton
+          title={mode === 'login' ? 'Log In' : 'Sign Up'}
+          icon={mode === 'login' ? 'login' : 'person-add-alt'}
           onPress={submit}
           disabled={submitting}
-        >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryButtonText}>
-              {mode === 'login' ? 'Log In' : 'Sign Up'}
-            </Text>
-          )}
-        </Pressable>
+          loading={submitting}
+          style={styles.primaryButton}
+        />
 
         <Pressable onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
           <Text style={styles.switchModeText}>
@@ -171,19 +167,10 @@ const makeStyles = (colors) => StyleSheet.create({
     marginBottom: 12,
   },
   primaryButton: {
-    backgroundColor: colors.activePill,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
     marginTop: 4,
   },
   disabledButton: {
     opacity: 0.6,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   switchModeText: {
     color: colors.textMuted,

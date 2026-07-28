@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { checkGrammar } from '../services/wordsService';
+import OutlinedButton from '../components/OutlinedButton';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
@@ -42,7 +43,7 @@ export default function GrammarScreen() {
   };
 
   const canCheck = sentence.trim() !== '' && !loading;
-  const showCorrection = result && !result.correct && result.corrected && result.corrected !== sentence.trim();
+  const showCorrection = Boolean(result?.corrected);
 
   const reset = () => {
     setSentence('');
@@ -71,17 +72,18 @@ export default function GrammarScreen() {
         />
 
         <View style={styles.actionRow}>
-          <Pressable
-            style={[styles.checkButton, !canCheck && styles.checkButtonDisabled]}
+          <OutlinedButton
+            title={loading ? 'KI prüft…' : 'Prüfen mit KI'}
+            icon="fact-check"
+            tone="ai"
             onPress={handleCheck}
             disabled={!canCheck}
-          >
-            <Ionicons name="checkmark-done" size={16} color="#fff" />
-            <Text style={styles.checkButtonText}>{loading ? 'Prüft…' : 'Prüfen'}</Text>
-          </Pressable>
+            loading={loading}
+            style={styles.checkButton}
+          />
 
           <Pressable style={styles.clearButton} onPress={reset}>
-            <Ionicons name="trash-outline" size={16} color={colors.textDark} />
+            <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
             <Text style={styles.clearButtonText}>Clear All</Text>
           </Pressable>
         </View>
@@ -106,7 +108,9 @@ export default function GrammarScreen() {
 
             {showCorrection ? (
               <>
-                <Text style={styles.label}>KORREKTUR</Text>
+                <Text style={styles.label}>
+                  {result.correct ? 'KORREKTER SATZ' : 'KORRIGIERTER SATZ'}
+                </Text>
                 <View style={styles.correctionCard}>
                   <Text style={styles.correctionText}>{result.corrected}</Text>
                 </View>
@@ -193,21 +197,6 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   checkButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.headerBg,
-    borderRadius: 10,
-    paddingVertical: 14,
-  },
-  checkButtonDisabled: {
-    backgroundColor: colors.disabledButton,
-  },
-  checkButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
   },
   clearButton: {
     flexDirection: 'row',
@@ -222,7 +211,7 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingHorizontal: 16,
   },
   clearButtonText: {
-    color: colors.textDark,
+    color: colors.die.text,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -241,9 +230,9 @@ const makeStyles = (colors) => StyleSheet.create({
     fontWeight: '800',
   },
   correctionCard: {
-    backgroundColor: GOOD.bg,
+    backgroundColor: colors.das.bg,
     borderWidth: 1,
-    borderColor: GOOD.border,
+    borderColor: colors.das.text,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -251,7 +240,7 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   correctionText: {
     fontSize: 16,
-    color: colors.textDark,
+    color: colors.das.text,
     fontWeight: '600',
     lineHeight: 23,
   },

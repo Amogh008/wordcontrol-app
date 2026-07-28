@@ -49,6 +49,86 @@ function EmptyState({ message, onExit }) {
   );
 }
 
+function Flashcards({ words, onExit }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const pool = useMemo(
+    () => words.filter((word) => word.wort && word.bedeutung),
+    [words],
+  );
+  const [cardIndex, setCardIndex] = useState(() =>
+    pool.length > 0 ? Math.floor(Math.random() * pool.length) : 0,
+  );
+
+  if (pool.length === 0) {
+    return (
+      <EmptyState
+        message="Du brauchst mindestens ein gespeichertes Wort mit Bedeutung für die Lernkarten."
+        onExit={onExit}
+      />
+    );
+  }
+
+  const card = pool[cardIndex % pool.length];
+  const articleColors = colors[card.artikel] ?? colors.misc;
+
+  const drawNext = () => {
+    if (pool.length === 1) {
+      setCardIndex((index) => index + 1);
+      return;
+    }
+
+    setCardIndex((current) => {
+      const nextOffset = 1 + Math.floor(Math.random() * (pool.length - 1));
+      return (current + nextOffset) % pool.length;
+    });
+  };
+
+  return (
+    <View style={styles.gameArea}>
+      <View style={styles.scoreRow}>
+        <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
+          <Ionicons name="chevron-back" size={20} color={colors.textDark} />
+          <Text style={styles.exitText}>Spiele</Text>
+        </Pressable>
+        <Text style={styles.scoreText}>{pool.length} Lernkarten</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.flashcardBody}>
+        <Text style={styles.questionLabel}>Zufällige Lernkarte</Text>
+        <View style={[styles.flashcard, { borderColor: articleColors.text }]}>
+          <View style={[styles.flashcardBadge, { backgroundColor: articleColors.bg }]}>
+            <Text style={[styles.flashcardBadgeText, { color: articleColors.text }]}>
+              {card.artikel || 'Wort'}
+            </Text>
+          </View>
+
+          <Text style={[styles.flashcardWord, { color: articleColors.text }]}>
+            {card.artikel ? `${card.artikel} ${card.wort}` : card.wort}
+          </Text>
+
+          <View style={styles.flashcardDivider} />
+
+          <Text style={styles.flashcardLabel}>BEDEUTUNG</Text>
+          <Text style={styles.flashcardMeaning}>{card.bedeutung}</Text>
+
+          {card.notizen ? (
+            <>
+              <Text style={styles.flashcardLabel}>NOTIZEN</Text>
+              <Text style={styles.flashcardNotes}>{card.notizen}</Text>
+            </>
+          ) : null}
+        </View>
+
+        <Pressable style={styles.flashcardNextButton} onPress={drawNext}>
+          <Ionicons name="shuffle" size={19} color={colors.misc.text} />
+          <Text style={styles.flashcardNextText}>Nächste zufällige Karte</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
 function MeaningGame({ words, onExit }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -254,6 +334,7 @@ export default function GamesView({ words }) {
 
   if (game === 'meaning') return <MeaningGame words={words} onExit={() => setGame(null)} />;
   if (game === 'artikel') return <ArtikelGame words={words} onExit={() => setGame(null)} />;
+  if (game === 'flashcards') return <Flashcards words={words} onExit={() => setGame(null)} />;
 
   return (
     <ScrollView contentContainerStyle={styles.menu}>
@@ -275,6 +356,19 @@ export default function GamesView({ words }) {
         <View style={styles.menuTextWrap}>
           <Text style={styles.menuTitle}>Artikel raten</Text>
           <Text style={styles.menuSubtitle}>der, die oder das? Rate den Artikel des Substantivs.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </Pressable>
+
+      <Pressable style={styles.menuCard} onPress={() => setGame('flashcards')}>
+        <View style={[styles.menuIcon, { backgroundColor: colors.misc.bg }]}>
+          <Ionicons name="albums" size={26} color={colors.misc.text} />
+        </View>
+        <View style={styles.menuTextWrap}>
+          <Text style={styles.menuTitle}>Lernkarten</Text>
+          <Text style={styles.menuSubtitle}>
+            Ziehe zufällige Karten mit Wort, Bedeutung und Notizen.
+          </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
       </Pressable>
@@ -372,6 +466,85 @@ const makeStyles = (colors) => StyleSheet.create({
     fontSize: 15,
     color: '#cfc9bd',
     textAlign: 'center',
+  },
+  flashcardBody: {
+    paddingTop: 8,
+    paddingBottom: 30,
+  },
+  flashcard: {
+    minHeight: 320,
+    backgroundColor: colors.cardBg,
+    borderWidth: 2,
+    borderRadius: 18,
+    padding: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  flashcardBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    marginBottom: 14,
+  },
+  flashcardBadgeText: {
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  flashcardWord: {
+    fontSize: 30,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  flashcardDivider: {
+    width: 64,
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 22,
+  },
+  flashcardLabel: {
+    marginTop: 4,
+    marginBottom: 5,
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  flashcardMeaning: {
+    marginBottom: 18,
+    color: colors.textDark,
+    fontSize: 21,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  flashcardNotes: {
+    color: colors.textDark,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  flashcardNextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    marginTop: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1.5,
+    borderColor: colors.misc.text,
+    borderRadius: 10,
+    backgroundColor: colors.misc.bg,
+  },
+  flashcardNextText: {
+    color: colors.misc.text,
+    fontSize: 15,
+    fontWeight: '800',
   },
   option: {
     flexDirection: 'row',

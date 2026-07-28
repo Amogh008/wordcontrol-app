@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import OutlinedButton from '../components/OutlinedButton';
 import {
   addNote,
   clearNotes,
@@ -242,18 +243,18 @@ export default function NotesScreen() {
             </Pressable>
 
             <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.saveButton, canSave ? styles.saveButtonActive : styles.saveButtonDisabled]}
+              <OutlinedButton
+                title={saving ? 'Speichern…' : editingId ? 'Änderungen speichern' : 'Notiz speichern'}
+                icon="save"
+                tone="success"
                 onPress={handleSave}
                 disabled={!canSave || saving}
-              >
-                <Text style={styles.saveButtonText}>
-                  {saving ? 'Speichern…' : editingId ? 'Änderungen speichern' : 'Notiz speichern'}
-                </Text>
-              </Pressable>
+                loading={saving}
+                style={styles.saveButton}
+              />
 
               <Pressable style={styles.clearButton} onPress={resetForm}>
-                <Ionicons name="close-outline" size={16} color={colors.textDark} />
+                <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
                 <Text style={styles.clearButtonText}>Clear</Text>
               </Pressable>
             </View>
@@ -458,20 +459,6 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   saveButton: {
     flex: 1,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  saveButtonActive: {
-    backgroundColor: colors.headerBg,
-  },
-  saveButtonDisabled: {
-    backgroundColor: colors.disabledButton,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
   },
   clearButton: {
     flexDirection: 'row',
@@ -513,7 +500,7 @@ const makeStyles = (colors) => StyleSheet.create({
     borderColor: colors.border,
   },
   clearAllButtonText: {
-    color: colors.textDark,
+    color: colors.die.text,
     fontSize: 13,
     fontWeight: '700',
   },

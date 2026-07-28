@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { translateText } from '../services/wordsService';
+import OutlinedButton from '../components/OutlinedButton';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
@@ -89,19 +90,18 @@ export default function TranslationScreen() {
         />
 
         <View style={styles.actionRow}>
-          <Pressable
-            style={[styles.translateButton, !canTranslate && styles.translateButtonDisabled]}
+          <OutlinedButton
+            title={loading ? 'KI übersetzt…' : 'Übersetzen mit KI'}
+            icon="translate"
+            tone="ai"
             onPress={handleTranslate}
             disabled={!canTranslate}
-          >
-            <Ionicons name="language" size={16} color="#fff" />
-            <Text style={styles.translateButtonText}>
-              {loading ? 'Übersetzt…' : 'Übersetzen'}
-            </Text>
-          </Pressable>
+            loading={loading}
+            style={styles.translateButton}
+          />
 
           <Pressable style={styles.clearButton} onPress={reset}>
-            <Ionicons name="trash-outline" size={16} color={colors.textDark} />
+            <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
             <Text style={styles.clearButtonText}>Clear All</Text>
           </Pressable>
         </View>
@@ -214,21 +214,6 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   translateButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.headerBg,
-    borderRadius: 10,
-    paddingVertical: 14,
-  },
-  translateButtonDisabled: {
-    backgroundColor: colors.disabledButton,
-  },
-  translateButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
   },
   clearButton: {
     flexDirection: 'row',
@@ -243,7 +228,7 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingHorizontal: 16,
   },
   clearButtonText: {
-    color: colors.textDark,
+    color: colors.die.text,
     fontSize: 15,
     fontWeight: '700',
   },

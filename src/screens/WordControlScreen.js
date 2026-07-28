@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { articles, selectableArticles } from '../theme/colors';
 import { useTheme } from '../context/ThemeContext';
 import { addWord, autofillWord, deleteWord, getWords, updateWord } from '../services/wordsService';
+import OutlinedButton from '../components/OutlinedButton';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
@@ -61,6 +62,17 @@ export default function WordControlScreen() {
   const [saving, setSaving] = useState(false);
   const [filling, setFilling] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [toast, setToast] = useState('');
+  const toastTimerRef = useRef(null);
+
+  const showToast = useCallback((message) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(message);
+    toastTimerRef.current = setTimeout(() => {
+      setToast('');
+      toastTimerRef.current = null;
+    }, 4500);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,6 +89,13 @@ export default function WordControlScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    },
+    [],
+  );
 
   const counts = useMemo(() => {
     const base = { Alle: words.length, der: 0, die: 0, das: 0, misc: 0 };
@@ -141,10 +160,28 @@ export default function WordControlScreen() {
     if (wort.trim() === '' || filling) return;
     setFilling(true);
     try {
-      const suggestion = await autofillWord({ wort: wort.trim(), artikel });
-      if (!artikel && suggestion.artikel) setArtikel(suggestion.artikel);
+      const currentWort = wort.trim();
+      const currentArtikel = artikel;
+      const suggestion = await autofillWord({ wort: currentWort, artikel: currentArtikel });
+      const corrections = [];
+      const correctedWort = suggestion.wort?.trim();
+
+      if (correctedWort && correctedWort !== currentWort) {
+        setWort(correctedWort);
+        corrections.push(`Rechtschreibung: „${currentWort}“ → „${correctedWort}“`);
+      }
+
+      if (suggestion.artikel === '' || selectableArticles.includes(suggestion.artikel)) {
+        setArtikel(suggestion.artikel);
+        if (currentArtikel && suggestion.artikel !== currentArtikel) {
+          corrections.push(
+            `Artikel: „${currentArtikel}“ → „${suggestion.artikel || 'kein Artikel'}“`,
+          );
+        }
+      }
       if (suggestion.bedeutung) setBedeutung(suggestion.bedeutung);
       if (suggestion.notizen) setNotizen(suggestion.notizen);
+      if (corrections.length > 0) showToast(corrections.join('\n'));
     } catch (err) {
       const msg =
         err.response?.data?.error ?? err.message ?? 'Could not autofill this word.';
@@ -261,18 +298,18 @@ export default function WordControlScreen() {
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.formCard}>
             <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.saveButton, canSave ? styles.saveButtonActive : styles.saveButtonDisabled]}
+              <OutlinedButton
+                title={saving ? 'Speichern…' : editingId ? 'Änderungen speichern' : 'Wort speichern'}
+                icon="save"
+                tone="success"
                 onPress={handleSave}
                 disabled={!canSave || saving}
-              >
-                <Text style={styles.saveButtonText}>
-                  {saving ? 'Speichern…' : editingId ? 'Änderungen speichern' : 'Wort speichern'}
-                </Text>
-              </Pressable>
+                loading={saving}
+                style={styles.saveButton}
+              />
 
               <Pressable style={styles.clearButton} onPress={resetForm}>
-                <Ionicons name="trash-outline" size={16} color={colors.textDark} />
+                <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
                 <Text style={styles.clearButtonText}>Clear All</Text>
               </Pressable>
             </View>
@@ -452,6 +489,13 @@ export default function WordControlScreen() {
           )}
         </View>
       )}
+
+      {toast ? (
+        <View style={styles.toast} pointerEvents="none">
+          <Ionicons name="checkmark-circle" size={20} color="#fff" />
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      ) : null}
 
       <Modal
         visible={!!detailWord}
@@ -783,21 +827,6 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   saveButton: {
     flex: 1,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  saveButtonActive: {
-    backgroundColor: colors.headerBg,
-    borderRadius: 10,
-  },
-  saveButtonDisabled: {
-    backgroundColor: colors.disabledButton,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
   },
   clearButton: {
     flexDirection: 'row',
@@ -812,7 +841,7 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingHorizontal: 16,
   },
   clearButtonText: {
-    color: colors.textDark,
+    color: colors.die.text,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -870,5 +899,31 @@ const makeStyles = (colors) => StyleSheet.create({
     fontSize: 13,
     color: colors.textMuted,
     flex: 0.6,
+  },
+  toast: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 24,
+    zIndex: 100,
+    elevation: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.headerBg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+  },
+  toastText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
   },
 });
