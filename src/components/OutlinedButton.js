@@ -28,7 +28,7 @@ export default function OutlinedButton({
         success && styles.buttonSuccess,
         ai && styles.buttonAi,
         style,
-        inactive && styles.buttonDisabled,
+        inactive && (success ? styles.buttonSuccessDisabled : styles.buttonDisabled),
         pressed && !inactive && (success || ai ? styles.buttonTonePressed : styles.buttonPressed),
       ]}
     >
@@ -41,14 +41,14 @@ export default function OutlinedButton({
         <MaterialIcons
           name={icon}
           size={19}
-          color={inactive ? colors.textMuted : success ? colors.das.text : colors.misc.text}
+          color={success ? colors.das.text : inactive ? colors.textMuted : colors.misc.text}
         />
       )}
       <Text
         style={[
           styles.text,
           success && styles.textSuccess,
-          inactive && styles.textDisabled,
+          inactive && !success && styles.textDisabled,
         ]}
       >
         {title}
@@ -90,6 +90,11 @@ const makeStyles = (colors) =>
       borderColor: colors.border,
       backgroundColor: 'transparent',
       opacity: 0.7,
+    },
+    buttonSuccessDisabled: {
+      borderColor: colors.das.text,
+      backgroundColor: 'transparent',
+      opacity: 0.55,
     },
     text: {
       color: colors.misc.text,
