@@ -488,6 +488,48 @@ function StoryActivity({ words, onExit }) {
         </Pressable>
       </View>
 
+      {story?.title ? (
+        <View style={styles.storyStickyControls}>
+          <Pressable
+            style={[
+              styles.storyTranslateToggle,
+              translationMode && styles.storyTranslateToggleActive,
+            ]}
+            onPress={toggleTranslationMode}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: translationMode }}
+            accessibilityLabel="Satz übersetzen"
+          >
+            <Text
+              style={[
+                styles.storyTranslateToggleText,
+                translationMode && styles.storyTranslateToggleTextActive,
+              ]}
+            >
+              Satz übersetzen
+            </Text>
+            <View
+              style={[
+                styles.storyTranslateSwitchTrack,
+                translationMode && styles.storyTranslateSwitchTrackActive,
+              ]}
+            >
+              <View
+                style={[
+                  styles.storyTranslateSwitchThumb,
+                  translationMode && styles.storyTranslateSwitchThumbActive,
+                ]}
+              />
+            </View>
+          </Pressable>
+          {translationMode ? (
+            <Text style={styles.storyTranslateHint}>
+              Tippe auf einen Satz oder markiere einen beliebigen Textabschnitt.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {loading && !story?.title ? (
         <View style={styles.storyLoading}>
           <ActivityIndicator size="large" color={colors.misc.text} />
@@ -515,44 +557,6 @@ function StoryActivity({ words, onExit }) {
 
           {story?.title ? (
             <>
-              <Pressable
-                style={[
-                  styles.storyTranslateToggle,
-                  translationMode && styles.storyTranslateToggleActive,
-                ]}
-                onPress={toggleTranslationMode}
-                accessibilityRole="switch"
-                accessibilityState={{ checked: translationMode }}
-                accessibilityLabel="Satz übersetzen"
-              >
-                <Text
-                  style={[
-                    styles.storyTranslateToggleText,
-                    translationMode && styles.storyTranslateToggleTextActive,
-                  ]}
-                >
-                  Satz übersetzen
-                </Text>
-                <View
-                  style={[
-                    styles.storyTranslateSwitchTrack,
-                    translationMode && styles.storyTranslateSwitchTrackActive,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.storyTranslateSwitchThumb,
-                      translationMode && styles.storyTranslateSwitchThumbActive,
-                    ]}
-                  />
-                </View>
-              </Pressable>
-              {translationMode ? (
-                <Text style={styles.storyTranslateHint}>
-                  Tippe auf einen Satz oder markiere einen beliebigen Textabschnitt.
-                </Text>
-              ) : null}
-
               <View style={styles.storyPaper}>
                 <Text style={styles.storyTitle}>{story.title}</Text>
                 <View style={styles.storyTitleRule} />
@@ -1694,6 +1698,14 @@ const makeStyles = (colors) => StyleSheet.create({
     marginBottom: 10,
     paddingVertical: 7,
     paddingLeft: 4,
+  },
+  storyStickyControls: {
+    zIndex: 2,
+    paddingTop: 4,
+    paddingBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.pageBg,
   },
   storyTranslateToggleActive: {
     opacity: 1,

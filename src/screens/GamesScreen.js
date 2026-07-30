@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
@@ -12,14 +12,16 @@ export default function GamesScreen({ active }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [words, setWords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const hasLoaded = useRef(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     try {
       setWords(await getWords());
     } catch {
-      setWords([]);
+      if (!hasLoaded.current) setWords([]);
     } finally {
+      hasLoaded.current = true;
       setLoading(false);
     }
   }, []);
@@ -41,7 +43,7 @@ export default function GamesScreen({ active }) {
       </View>
 
       <View style={styles.body}>
-        {loading ? (
+        {loading && !hasLoaded.current ? (
           <Text style={styles.loading}>Lädt…</Text>
         ) : (
           <GamesView words={words} />
