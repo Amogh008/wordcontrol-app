@@ -4,7 +4,7 @@
     "slug": "wordcontrol",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "com.anonymous.wordcontrol",
+    "scheme": "com.amogh.wordcontrol",
     "icon": "./assets/icon_wordcontrol.png",
     "userInterfaceStyle": "dark",
     "ios": {
@@ -12,12 +12,13 @@
       "supportsTablet": true
     },
     "android": {
+      "versionCode": 1,
       "icon": "./assets/icon_wordcontrol.png",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/icon_wordcontrol.png"
       },
-      "package": "com.anonymous.wordcontrol"
+      "package": "com.amogh.wordcontrol"
     },
     "web": {
       "favicon": "./assets/icon_wordcontrol.png"
