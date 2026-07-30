@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { selectableArticles } from '../theme/colors';
 import { useTheme } from '../context/ThemeContext';
 import { streamStory, translateText } from '../services/wordsService';
+import ReadAloudButton from './ReadAloudButton';
 
 const GOOD = { text: '#2f9e44', bg: '#d3f9d8', border: '#2f9e44' };
 const BAD = { text: '#c92a2a', bg: '#ffe3e3', border: '#c92a2a' };
@@ -144,7 +145,13 @@ function Flashcards({ words, onExit }) {
   );
 }
 
-function InteractiveParagraph({ paragraph, words, onPress }) {
+function InteractiveParagraph({
+  paragraph,
+  words,
+  onPress,
+  translationMode = false,
+  onTranslate,
+}) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const lookup = useMemo(
@@ -153,85 +160,61 @@ function InteractiveParagraph({ paragraph, words, onPress }) {
         words
           .filter((word) => word.wort)
           .map((word) => [word.wort.toLocaleLowerCase('de-DE'), word]),
-      ),
+    ),
     [words],
   );
-  const parts = useMemo(
-    () => paragraph.split(/(\p{L}+(?:[’'-]\p{L}+)*)/gu),
+  const sentences = useMemo(
+    () => paragraph.match(/[^.!?…]+(?:[.!?…]+["'»“”]?|$)\s*/gu) || [paragraph],
     [paragraph],
   );
 
   return (
     <Text style={styles.storyParagraph}>
-      {parts.map((part, index) => {
-        if (!/^\p{L}/u.test(part)) return <Text key={`${index}-${part}`}>{part}</Text>;
-        const savedWord = lookup.get(part.toLocaleLowerCase('de-DE'));
-        const word = savedWord ?? { wort: part };
-        return (
-          <Text
-            key={`${index}-${part}`}
-            style={[
-              styles.storyClickableWord,
-              savedWord && styles.storyInteractiveWord,
-            ]}
-            onPress={() => onPress(word)}
-          >
-            {part}
-          </Text>
-        );
-      })}
+      {sentences.map((sentence, sentenceIndex) => (
+        <Text
+          key={`${sentenceIndex}-${sentence.slice(0, 20)}`}
+          onPress={translationMode ? () => onTranslate(sentence.trim()) : undefined}
+        >
+          {sentence.split(/(\p{L}+(?:[’'-]\p{L}+)*)/gu).map((part, partIndex) => {
+            if (!/^\p{L}/u.test(part)) {
+              return <Text key={`${partIndex}-${part}`}>{part}</Text>;
+            }
+            const savedWord = lookup.get(part.toLocaleLowerCase('de-DE'));
+            const word = savedWord ?? { wort: part };
+            return (
+              <Text
+                key={`${partIndex}-${part}`}
+                style={[
+                  styles.storyClickableWord,
+                  savedWord && styles.storyInteractiveWord,
+                ]}
+                onPress={
+                  translationMode
+                    ? undefined
+                    : (event) => {
+                        event.stopPropagation();
+                        onPress(word);
+                      }
+                }
+              >
+                {part}
+              </Text>
+            );
+          })}
+        </Text>
+      ))}
     </Text>
   );
 }
 
-function TranslatableParagraph({ paragraph, selectedText, onTranslate }) {
-  const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const sentences = useMemo(
-    () => paragraph.match(/[^.!?…]+(?:[.!?…]+["'»“”]?|$)\s*/gu) || [paragraph],
-    [paragraph],
-  );
-  const renderSentence = (sentence) => {
-    if (!selectedText || !sentence.includes(selectedText)) return sentence;
-    const parts = sentence.split(selectedText);
-    return parts.map((part, index) => (
-      <Text key={`${index}-${part.slice(0, 12)}`}>
-        {part}
-        {index < parts.length - 1 ? (
-          <Text style={styles.storySelectedText}>{selectedText}</Text>
-        ) : null}
-      </Text>
-    ));
-  };
-
-  const translateSelection = () => {
-    if (typeof window === 'undefined') return false;
-    const selected = window.getSelection?.().toString().trim();
-    if (!selected) return false;
-    onTranslate(selected);
-    window.getSelection?.().removeAllRanges();
-    return true;
-  };
-
+function TranslatableParagraph({ paragraph, words, onTranslate }) {
   return (
-    <Text
-      selectable
-      style={styles.storyParagraph}
-      onMouseUp={translateSelection}
-      onTouchEnd={() => setTimeout(translateSelection, 0)}
-    >
-      {sentences.map((sentence, index) => (
-        <Text
-          key={`${index}-${sentence.slice(0, 20)}`}
-          style={styles.storyTranslatableSentence}
-          onPress={() => {
-            if (!translateSelection()) onTranslate(sentence.trim());
-          }}
-        >
-          {renderSentence(sentence)}
-        </Text>
-      ))}
-    </Text>
+    <InteractiveParagraph
+      paragraph={paragraph}
+      words={words}
+      translationMode
+      onTranslate={onTranslate}
+    />
   );
 }
 
@@ -476,7 +459,14 @@ function StoryActivity({ words, onExit }) {
   };
 
   return (
-    <View style={styles.gameArea}>
+    <Pressable
+      style={styles.gameArea}
+      onPress={() => {
+        if (!activeWord) return;
+        wordMeaningRequest.current += 1;
+        setActiveWord(null);
+      }}
+    >
       <View style={styles.scoreRow}>
         <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
           <Ionicons name="chevron-back" size={20} color={colors.textDark} />
@@ -565,7 +555,7 @@ function StoryActivity({ words, onExit }) {
                     {translationMode ? (
                       <TranslatableParagraph
                         paragraph={paragraph}
-                        selectedText={translation?.source}
+                        words={vocabulary}
                         onTranslate={handleTranslate}
                       />
                     ) : (
@@ -645,34 +635,38 @@ function StoryActivity({ words, onExit }) {
       </Modal>
 
       {activeWord ? (
-        <>
           <Pressable
-            style={styles.storyMeaningDismissLayer}
-            onPress={() => {
-              wordMeaningRequest.current += 1;
-              setActiveWord(null);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Bedeutung schließen"
-          />
-          <View style={styles.wordMeaningOverlay}>
+            style={styles.wordMeaningOverlay}
+            onPress={(event) => event.stopPropagation()}
+          >
           <View style={styles.wordMeaningHeader}>
             <Text style={styles.wordMeaningTitle}>
               {activeWord.word.artikel
                 ? `${activeWord.word.artikel} ${activeWord.word.wort}`
                 : activeWord.word.wort}
             </Text>
-            {activeWord.pinned ? (
-              <Pressable
-                onPress={() => {
-                  wordMeaningRequest.current += 1;
-                  setActiveWord(null);
-                }}
-                hitSlop={8}
-              >
-                <Ionicons name="close" size={20} color={colors.textMuted} />
-              </Pressable>
-            ) : null}
+            <View style={styles.wordMeaningActions}>
+              <ReadAloudButton
+                text={
+                  activeWord.word.artikel
+                    ? `${activeWord.word.artikel} ${activeWord.word.wort}`
+                    : activeWord.word.wort
+                }
+                language="de-DE"
+                compact
+              />
+              {activeWord.pinned ? (
+                <Pressable
+                  onPress={() => {
+                    wordMeaningRequest.current += 1;
+                    setActiveWord(null);
+                  }}
+                  hitSlop={8}
+                >
+                  <Ionicons name="close" size={20} color={colors.textMuted} />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
           {activeWord.loading ? (
             <View style={styles.translationLoading}>
@@ -689,23 +683,29 @@ function StoryActivity({ words, onExit }) {
               {activeWord.word.notizen}
             </Text>
           ) : null}
-          </View>
-        </>
+          </Pressable>
       ) : null}
 
       {translation ? (
         <View style={styles.wordMeaningOverlay}>
           <View style={styles.wordMeaningHeader}>
             <Text style={styles.translationOverlayLabel}>DE → EN</Text>
-            <Pressable
-              onPress={() => {
-                translationRequest.current += 1;
-                setTranslation(null);
-              }}
-              hitSlop={8}
-            >
-              <Ionicons name="close" size={20} color={colors.textMuted} />
-            </Pressable>
+            <View style={styles.wordMeaningActions}>
+              <ReadAloudButton
+                text={translation.source}
+                language="de-DE"
+                compact
+              />
+              <Pressable
+                onPress={() => {
+                  translationRequest.current += 1;
+                  setTranslation(null);
+                }}
+                hitSlop={8}
+              >
+                <Ionicons name="close" size={20} color={colors.textMuted} />
+              </Pressable>
+            </View>
           </View>
           <Text style={styles.translationSource} numberOfLines={3}>
             {translation.source}
@@ -722,7 +722,7 @@ function StoryActivity({ words, onExit }) {
           )}
         </View>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -1824,10 +1824,6 @@ const makeStyles = (colors) => StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
   },
-  storyMeaningDismissLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 40,
-  },
   wordMeaningOverlay: {
     position: 'absolute',
     left: 8,
@@ -1849,6 +1845,11 @@ const makeStyles = (colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  wordMeaningActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   wordMeaningTitle: {
     color: colors.misc.text,

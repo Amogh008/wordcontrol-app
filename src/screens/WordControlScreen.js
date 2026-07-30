@@ -17,6 +17,7 @@ import { articles, selectableArticles } from '../theme/colors';
 import { useTheme } from '../context/ThemeContext';
 import { addWord, autofillWord, deleteWord, getWords, updateWord } from '../services/wordsService';
 import OutlinedButton from '../components/OutlinedButton';
+import ReadAloudButton from '../components/ReadAloudButton';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
@@ -518,6 +519,15 @@ export default function WordControlScreen() {
                   >
                     {detailWord.artikel ? `${detailWord.artikel} ${detailWord.wort}` : detailWord.wort}
                   </Text>
+                  <ReadAloudButton
+                    text={
+                      detailWord.artikel
+                        ? `${detailWord.artikel} ${detailWord.wort}`
+                        : detailWord.wort
+                    }
+                    language="de-DE"
+                    compact
+                  />
                   <Pressable
                     onPress={() => handleEdit(detailWord)}
                     hitSlop={10}

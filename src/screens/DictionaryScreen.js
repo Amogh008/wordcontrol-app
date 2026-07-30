@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { getDictionaryEntry, searchDictionary } from '../services/dictionaryService';
+import ReadAloudButton from '../components/ReadAloudButton';
 
 function Section({ title, children, styles }) {
   return (
@@ -147,9 +148,16 @@ export default function DictionaryScreen() {
       ) : entry ? (
         <ScrollView contentContainerStyle={styles.entryBody}>
           <View style={styles.wordHeader}>
-            <Text style={styles.word}>
-              {entry.article ? `${entry.article} ` : ''}{entry.lemma}
-            </Text>
+            <View style={styles.wordTitleRow}>
+              <Text style={styles.word}>
+                {entry.article ? `${entry.article} ` : ''}{entry.lemma}
+              </Text>
+              <ReadAloudButton
+                text={entry.article ? `${entry.article} ${entry.lemma}` : entry.lemma}
+                language="de-DE"
+                compact
+              />
+            </View>
             <Text style={styles.partOfSpeech}>{entry.partOfSpeech}</Text>
             {entry.word !== entry.lemma ? (
               <Text style={styles.queriedForm}>Gesuchte Form: {entry.word}</Text>
@@ -205,7 +213,10 @@ export default function DictionaryScreen() {
           <Section title="BEISPIELSÄTZE" styles={styles}>
             {entry.examples?.map((example, index) => (
               <View key={`${example.german}-${index}`} style={styles.exampleCard}>
-                <Text style={styles.exampleGerman}>{example.german}</Text>
+                <View style={styles.exampleGermanRow}>
+                  <Text style={styles.exampleGerman}>{example.german}</Text>
+                  <ReadAloudButton text={example.german} language="de-DE" compact />
+                </View>
                 <Text style={styles.exampleEnglish}>{example.english}</Text>
               </View>
             ))}
@@ -261,7 +272,8 @@ const makeStyles = (colors) => StyleSheet.create({
   errorText: { color: colors.die.text, lineHeight: 20 },
   entryBody: { paddingHorizontal: 18, paddingBottom: 50 },
   wordHeader: { padding: 20, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.cardBg },
-  word: { color: colors.textDark, fontSize: 28, fontWeight: '800' },
+  wordTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  word: { flex: 1, color: colors.textDark, fontSize: 28, fontWeight: '800' },
   partOfSpeech: { alignSelf: 'flex-start', marginTop: 8, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, color: colors.misc.text, backgroundColor: colors.misc.bg, fontSize: 13, fontWeight: '800' },
   queriedForm: { marginTop: 10, color: colors.textMuted, fontSize: 13 },
   section: { marginTop: 24 },
@@ -281,7 +293,8 @@ const makeStyles = (colors) => StyleSheet.create({
   grammarLabel: { width: '42%', paddingHorizontal: 13, paddingVertical: 11, color: colors.textMuted, fontSize: 13, fontWeight: '700' },
   grammarValue: { flex: 1, paddingHorizontal: 13, paddingVertical: 11, borderLeftWidth: 1, borderLeftColor: colors.border, color: colors.textDark, fontSize: 15, fontWeight: '800' },
   exampleCard: { marginBottom: 10, padding: 14, borderLeftWidth: 3, borderLeftColor: colors.misc.text, borderRadius: 8, backgroundColor: colors.cardBg },
-  exampleGerman: { color: colors.textDark, fontSize: 15, fontWeight: '700', lineHeight: 22 },
+  exampleGermanRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  exampleGerman: { flex: 1, color: colors.textDark, fontSize: 15, fontWeight: '700', lineHeight: 22 },
   exampleEnglish: { marginTop: 4, color: colors.textMuted, fontSize: 14, lineHeight: 20 },
   note: { marginBottom: 7, color: colors.textDark, fontSize: 14, lineHeight: 20 },
   relatedWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
