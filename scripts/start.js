@@ -6,7 +6,7 @@ const args = process.argv.slice(2);
 const useLocalApi = args.some((arg) => DEV_ARGUMENTS.has(arg));
 const expoArgs = args.filter((arg) => !DEV_ARGUMENTS.has(arg));
 
-const LOCAL_API_URL = 'http://localhost:4001';
+const LOCAL_API_URL = 'http://localhost:4000';
 const HOSTED_API_URL = 'https://wordcontrol.onrender.com';
 const apiUrl = useLocalApi
   ? LOCAL_API_URL

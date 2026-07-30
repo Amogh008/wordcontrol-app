@@ -1,4 +1,5 @@
-import { apiClient } from './apiClient';
+import { apiClient, API_BASE_URL } from './apiClient';
+import { getToken } from './tokenStore';
 
 export async function getWords() {
   const { data } = await apiClient.get('/');
@@ -34,7 +35,61 @@ export async function checkGrammar({ sentence }) {
   return data;
 }
 
-export async function generateStory() {
-  const { data } = await apiClient.post('/story');
+export async function generateStory({ wordIds } = {}) {
+  const { data } = await apiClient.post('/story', { wordIds });
   return data;
+}
+
+export function streamStory({ wordIds, onDelta }) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    let processedLength = 0;
+    let pending = '';
+    let completedStory = null;
+
+    const consumeLines = (isFinal = false) => {
+      const nextText = request.responseText.slice(processedLength);
+      processedLength = request.responseText.length;
+      pending += nextText;
+      const lines = pending.split('\n');
+      pending = isFinal ? '' : lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+        if (event.type === 'delta') onDelta(event.text);
+        if (event.type === 'done') completedStory = event.story;
+        if (event.type === 'error') throw new Error(event.error);
+      }
+    };
+
+    request.open('POST', `${API_BASE_URL}/api/word/story/stream`);
+    request.setRequestHeader('Content-Type', 'application/json');
+    const token = getToken();
+    if (token) request.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    request.onprogress = () => {
+      try {
+        consumeLines();
+      } catch (err) {
+        request.abort();
+        reject(err);
+      }
+    };
+    request.onerror = () => reject(new Error('Die Verbindung zum Server wurde unterbrochen.'));
+    request.onload = () => {
+      try {
+        if (request.status < 200 || request.status >= 300) {
+          const payload = JSON.parse(request.responseText || '{}');
+          throw new Error(payload.error || `Story request failed (${request.status}).`);
+        }
+        consumeLines(true);
+        if (!completedStory) throw new Error('Die Geschichte wurde nicht vollständig übertragen.');
+        resolve(completedStory);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    request.send(JSON.stringify({ wordIds }));
+  });
 }

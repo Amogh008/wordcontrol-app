@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { selectableArticles } from '../theme/colors';
 import { useTheme } from '../context/ThemeContext';
-import { generateStory } from '../services/wordsService';
+import { streamStory, translateText } from '../services/wordsService';
 
 const GOOD = { text: '#2f9e44', bg: '#d3f9d8', border: '#2f9e44' };
 const BAD = { text: '#c92a2a', bg: '#ffe3e3', border: '#c92a2a' };
@@ -130,11 +139,7 @@ function Flashcards({ words, onExit }) {
   );
 }
 
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function InteractiveParagraph({ paragraph, words, onHover, onHoverEnd, onPress }) {
+function InteractiveParagraph({ paragraph, words, onPress }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const lookup = useMemo(
@@ -146,32 +151,81 @@ function InteractiveParagraph({ paragraph, words, onHover, onHoverEnd, onPress }
       ),
     [words],
   );
-  const parts = useMemo(() => {
-    const terms = [...lookup.values()]
-      .map((word) => word.wort)
-      .sort((a, b) => b.length - a.length)
-      .map(escapeRegex);
-    if (terms.length === 0) return [paragraph];
-    return paragraph.split(new RegExp(`(${terms.join('|')})`, 'giu'));
-  }, [lookup, paragraph]);
+  const parts = useMemo(
+    () => paragraph.split(/(\p{L}+(?:[’'-]\p{L}+)*)/gu),
+    [paragraph],
+  );
 
   return (
     <Text style={styles.storyParagraph}>
       {parts.map((part, index) => {
-        const word = lookup.get(part.toLocaleLowerCase('de-DE'));
-        if (!word) return <Text key={`${index}-${part}`}>{part}</Text>;
+        if (!/^\p{L}/u.test(part)) return <Text key={`${index}-${part}`}>{part}</Text>;
+        const savedWord = lookup.get(part.toLocaleLowerCase('de-DE'));
+        const word = savedWord ?? { wort: part };
         return (
           <Text
             key={`${index}-${part}`}
-            style={styles.storyInteractiveWord}
+            style={[
+              styles.storyClickableWord,
+              savedWord && styles.storyInteractiveWord,
+            ]}
             onPress={() => onPress(word)}
-            onMouseEnter={() => onHover(word)}
-            onMouseLeave={onHoverEnd}
           >
             {part}
           </Text>
         );
       })}
+    </Text>
+  );
+}
+
+function TranslatableParagraph({ paragraph, selectedText, onTranslate }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const sentences = useMemo(
+    () => paragraph.match(/[^.!?…]+(?:[.!?…]+["'»“”]?|$)\s*/gu) || [paragraph],
+    [paragraph],
+  );
+  const renderSentence = (sentence) => {
+    if (!selectedText || !sentence.includes(selectedText)) return sentence;
+    const parts = sentence.split(selectedText);
+    return parts.map((part, index) => (
+      <Text key={`${index}-${part.slice(0, 12)}`}>
+        {part}
+        {index < parts.length - 1 ? (
+          <Text style={styles.storySelectedText}>{selectedText}</Text>
+        ) : null}
+      </Text>
+    ));
+  };
+
+  const translateSelection = () => {
+    if (typeof window === 'undefined') return false;
+    const selected = window.getSelection?.().toString().trim();
+    if (!selected) return false;
+    onTranslate(selected);
+    window.getSelection?.().removeAllRanges();
+    return true;
+  };
+
+  return (
+    <Text
+      selectable
+      style={styles.storyParagraph}
+      onMouseUp={translateSelection}
+      onTouchEnd={() => setTimeout(translateSelection, 0)}
+    >
+      {sentences.map((sentence, index) => (
+        <Text
+          key={`${index}-${sentence.slice(0, 20)}`}
+          style={styles.storyTranslatableSentence}
+          onPress={() => {
+            if (!translateSelection()) onTranslate(sentence.trim());
+          }}
+        >
+          {renderSentence(sentence)}
+        </Text>
+      ))}
     </Text>
   );
 }
@@ -187,26 +241,86 @@ function StoryActivity({ words, onExit }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeWord, setActiveWord] = useState(null);
+  const [translationMode, setTranslationMode] = useState(false);
+  const [translation, setTranslation] = useState(null);
+  const [remainingWords, setRemainingWords] = useState(() => shuffle(vocabulary));
+  const [usedWords, setUsedWords] = useState([]);
+  const [roundWords, setRoundWords] = useState([]);
+  const [showSessionWords, setShowSessionWords] = useState(false);
+  const started = useRef(false);
+  const translationRequest = useRef(0);
+  const wordMeaningRequest = useRef(0);
+  const wordMeaningCache = useRef(new Map());
+  const lastSelection = useRef({ text: '', time: 0 });
 
-  const createStory = async () => {
-    if (vocabulary.length === 0 || loading) return;
+  const storyFromStreamText = (text) => {
+    const normalized = text.replace(/\r\n/g, '\n');
+    const newline = normalized.indexOf('\n');
+    if (newline === -1) return { title: normalized.trim(), paragraphs: [] };
+    const title = normalized.slice(0, newline).trim();
+    const body = normalized.slice(newline + 1).trim();
+    const paragraphs = body ? body.split(/\n\s*\n/).map((part) => part.trim()) : [];
+    return { title, paragraphs };
+  };
+
+  const createStory = async (batch = roundWords) => {
+    if (batch.length === 0 || loading) return;
     setLoading(true);
     setError('');
     setActiveWord(null);
+    wordMeaningRequest.current += 1;
+    setTranslation(null);
+    translationRequest.current += 1;
+    setStory(null);
+    setRoundWords(batch);
     try {
-      setStory(await generateStory());
+      let streamedText = '';
+      const completedStory = await streamStory({
+        wordIds: batch.map((word) => word.id ?? word._id),
+        onDelta: (text) => {
+          streamedText += text;
+          setStory(storyFromStreamText(streamedText));
+        },
+      });
+      setStory(completedStory);
+      setUsedWords((current) => {
+        const existing = new Set(current.map((word) => String(word.id ?? word._id)));
+        return [...current, ...batch.filter((word) => !existing.has(String(word.id ?? word._id)))];
+      });
+      const completedIds = new Set(batch.map((word) => String(word.id ?? word._id)));
+      setRemainingWords((current) =>
+        current.filter((word) => !completedIds.has(String(word.id ?? word._id))),
+      );
     } catch (err) {
-      setError(err.response?.data?.error ?? err.message ?? 'Die Geschichte konnte nicht erstellt werden.');
+      setError(err.message ?? 'Die Geschichte konnte nicht erstellt werden.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    createStory();
+    if (started.current || vocabulary.length === 0) return;
+    started.current = true;
+    createStory(remainingWords.slice(0, 30));
     // Generate only when this activity opens; regeneration is explicit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const continueSession = () => {
+    createStory(remainingWords.slice(0, 30));
+  };
+
+  const resetSession = () => {
+    if (loading) return;
+    const freshQueue = shuffle(vocabulary);
+    setRemainingWords(freshQueue);
+    setUsedWords([]);
+    setRoundWords([]);
+    setStory(null);
+    setError('');
+    setShowSessionWords(false);
+    createStory(freshQueue.slice(0, 30));
+  };
 
   if (vocabulary.length === 0) {
     return (
@@ -217,17 +331,103 @@ function StoryActivity({ words, onExit }) {
     );
   }
 
-  const handleHover = (word) => {
-    setActiveWord((current) => (current?.pinned ? current : { word, pinned: false }));
-  };
-  const handleHoverEnd = () => {
-    setActiveWord((current) => (current?.pinned ? current : null));
-  };
-  const handleWordPress = (word) => {
+  const handleWordPress = async (word) => {
     const id = word.id ?? word._id ?? word.wort;
-    setActiveWord((current) => {
-      const currentId = current?.word?.id ?? current?.word?._id ?? current?.word?.wort;
-      return current?.pinned && currentId === id ? null : { word, pinned: true };
+    const currentId =
+      activeWord?.word?.id ?? activeWord?.word?._id ?? activeWord?.word?.wort;
+    if (activeWord?.pinned && currentId === id) {
+      wordMeaningRequest.current += 1;
+      setActiveWord(null);
+      return;
+    }
+
+    if (word.bedeutung) {
+      wordMeaningRequest.current += 1;
+      setActiveWord({ word, pinned: true });
+      return;
+    }
+
+    const cacheKey = word.wort.toLocaleLowerCase('de-DE');
+    const cachedMeaning = wordMeaningCache.current.get(cacheKey);
+    if (cachedMeaning) {
+      setActiveWord({
+        word: { ...word, bedeutung: cachedMeaning },
+        pinned: true,
+      });
+      return;
+    }
+
+    const requestId = wordMeaningRequest.current + 1;
+    wordMeaningRequest.current = requestId;
+    setActiveWord({ word, pinned: true, loading: true, error: '' });
+    try {
+      const { translation: meaning } = await translateText({
+        text: word.wort,
+        from: 'de',
+        to: 'en',
+      });
+      if (wordMeaningRequest.current === requestId) {
+        wordMeaningCache.current.set(cacheKey, meaning);
+        setActiveWord({
+          word: { ...word, bedeutung: meaning },
+          pinned: true,
+          loading: false,
+          error: '',
+        });
+      }
+    } catch (err) {
+      if (wordMeaningRequest.current === requestId) {
+        setActiveWord({
+          word,
+          pinned: true,
+          loading: false,
+          error:
+            err.response?.data?.error ??
+            err.message ??
+            'Die Bedeutung konnte nicht geladen werden.',
+        });
+      }
+    }
+  };
+  const handleTranslate = async (selectedText) => {
+    const source = selectedText.replace(/\s+/g, ' ').trim();
+    if (!source) return;
+
+    const now = Date.now();
+    if (lastSelection.current.text === source && now - lastSelection.current.time < 500) return;
+    lastSelection.current = { text: source, time: now };
+
+    const requestId = translationRequest.current + 1;
+    translationRequest.current = requestId;
+    setActiveWord(null);
+    setTranslation({ source, text: '', loading: true, error: '' });
+    try {
+      const { translation: translatedText } = await translateText({
+        text: source,
+        from: 'de',
+        to: 'en',
+      });
+      if (translationRequest.current === requestId) {
+        setTranslation({ source, text: translatedText, loading: false, error: '' });
+      }
+    } catch (err) {
+      if (translationRequest.current === requestId) {
+        setTranslation({
+          source,
+          text: '',
+          loading: false,
+          error: err.response?.data?.error ?? err.message ?? 'Übersetzung fehlgeschlagen.',
+        });
+      }
+    }
+  };
+  const toggleTranslationMode = () => {
+    setTranslationMode((enabled) => {
+      const next = !enabled;
+      setActiveWord(null);
+      setTranslation(null);
+      translationRequest.current += 1;
+      return next;
     });
   };
 
@@ -238,56 +438,152 @@ function StoryActivity({ words, onExit }) {
           <Ionicons name="chevron-back" size={20} color={colors.textDark} />
           <Text style={styles.exitText}>Spiele</Text>
         </Pressable>
-        <Text style={styles.scoreText}>{vocabulary.length} Wörter verwendet</Text>
+        <Pressable style={styles.storyResetButton} onPress={resetSession} disabled={loading}>
+          <Ionicons name="refresh" size={16} color={colors.misc.text} />
+          <Text style={styles.storyResetText}>Sitzung zurücksetzen</Text>
+        </Pressable>
       </View>
 
-      {loading && !story ? (
+      {loading && !story?.title ? (
         <View style={styles.storyLoading}>
           <ActivityIndicator size="large" color={colors.misc.text} />
           <Text style={styles.storyLoadingText}>KI schreibt deine Geschichte…</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.storyBody}>
-          {error ? (
+          <Pressable
+            style={styles.storyProgressLink}
+            onPress={() => setShowSessionWords(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Verwendete Wörter dieser Runde und Sitzung anzeigen"
+          >
+            <Ionicons name="list-circle-outline" size={19} color={colors.misc.text} />
+            <Text style={styles.storyProgressLinkText}>
+              {roundWords.length} Wörter in dieser Runde · {usedWords.length}/{vocabulary.length} in
+              der Sitzung
+            </Text>
+          </Pressable>
+          {!loading && error ? (
             <View style={styles.storyError}>
               <Text style={styles.storyErrorText}>{error}</Text>
             </View>
           ) : null}
 
-          {story ? (
-            <View style={styles.storyPaper}>
-              <Text style={styles.storyTitle}>{story.title}</Text>
-              <View style={styles.storyTitleRule} />
-              {story.paragraphs.map((paragraph, index) => (
-                <View key={`${index}-${paragraph.slice(0, 24)}`} style={styles.storyParagraphWrap}>
-                  <InteractiveParagraph
-                    paragraph={paragraph}
-                    words={vocabulary}
-                    onHover={handleHover}
-                    onHoverEnd={handleHoverEnd}
-                    onPress={handleWordPress}
-                  />
-                </View>
-              ))}
-            </View>
+          {story?.title ? (
+            <>
+              <Pressable
+                style={[
+                  styles.storyTranslateToggle,
+                  translationMode && styles.storyTranslateToggleActive,
+                ]}
+                onPress={toggleTranslationMode}
+              >
+                <Ionicons
+                  name={translationMode ? 'language' : 'language-outline'}
+                  size={18}
+                  color={translationMode ? colors.cardBg : colors.misc.text}
+                />
+                <Text
+                  style={[
+                    styles.storyTranslateToggleText,
+                    translationMode && styles.storyTranslateToggleTextActive,
+                  ]}
+                >
+                  Satz übersetzen
+                </Text>
+              </Pressable>
+              {translationMode ? (
+                <Text style={styles.storyTranslateHint}>
+                  Tippe auf einen Satz oder markiere einen beliebigen Textabschnitt.
+                </Text>
+              ) : null}
+
+              <View style={styles.storyPaper}>
+                <Text style={styles.storyTitle}>{story.title}</Text>
+                <View style={styles.storyTitleRule} />
+                {story.paragraphs.map((paragraph, index) => (
+                  <View key={`${index}-${paragraph.slice(0, 24)}`} style={styles.storyParagraphWrap}>
+                    {translationMode ? (
+                      <TranslatableParagraph
+                        paragraph={paragraph}
+                        selectedText={translation?.source}
+                        onTranslate={handleTranslate}
+                      />
+                    ) : (
+                      <InteractiveParagraph
+                        paragraph={paragraph}
+                        words={vocabulary}
+                        onPress={handleWordPress}
+                      />
+                    )}
+                  </View>
+                ))}
+              </View>
+            </>
           ) : null}
 
-          <Pressable
-            style={[styles.storyGenerateButton, loading && styles.storyGenerateButtonDisabled]}
-            onPress={createStory}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.misc.text} />
-            ) : (
+          {!loading && error ? (
+            <Pressable
+              style={[styles.storyGenerateButton, loading && styles.storyGenerateButtonDisabled]}
+              onPress={() => createStory(roundWords)}
+              disabled={loading}
+            >
+              <Ionicons name="refresh" size={18} color={colors.misc.text} />
+              <Text style={styles.storyGenerateText}>Diese Runde erneut versuchen</Text>
+            </Pressable>
+          ) : !loading && story && remainingWords.length > 0 ? (
+            <Pressable
+              style={[styles.storyGenerateButton, loading && styles.storyGenerateButtonDisabled]}
+              onPress={continueSession}
+              disabled={loading}
+            >
               <Ionicons name="sparkles" size={18} color={colors.misc.text} />
-            )}
-            <Text style={styles.storyGenerateText}>
-              {loading ? 'KI schreibt…' : story ? 'Neue Geschichte mit KI' : 'Erneut versuchen'}
-            </Text>
-          </Pressable>
+              <Text style={styles.storyGenerateText}>
+                Weiter mit den nächsten {Math.min(30, remainingWords.length)} Wörtern
+              </Text>
+            </Pressable>
+          ) : !loading && story && usedWords.length === vocabulary.length ? (
+            <View style={styles.storySessionComplete}>
+              <Ionicons name="checkmark-circle" size={21} color={GOOD.text} />
+              <Text style={styles.storySessionCompleteText}>
+                Alle {vocabulary.length} Wörter wurden in dieser Sitzung verwendet.
+              </Text>
+            </View>
+          ) : null}
         </ScrollView>
       )}
+
+      <Modal
+        visible={showSessionWords}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSessionWords(false)}
+      >
+        <Pressable style={styles.storyModalBackdrop} onPress={() => setShowSessionWords(false)}>
+          <Pressable style={styles.storyModalCard} onPress={(event) => event.stopPropagation()}>
+            <View style={styles.wordMeaningHeader}>
+              <Text style={styles.storyModalTitle}>Wörter dieser Sitzung</Text>
+              <Pressable onPress={() => setShowSessionWords(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.textMuted} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.storyModalScroll}>
+              <Text style={styles.storyModalSection}>
+                Diese Runde ({roundWords.length})
+              </Text>
+              <Text style={styles.storyModalWords}>
+                {roundWords.map((word) => word.wort).join(' · ') || 'Noch keine Wörter'}
+              </Text>
+              <Text style={styles.storyModalSection}>
+                Bisher verwendet ({usedWords.length} von {vocabulary.length})
+              </Text>
+              <Text style={styles.storyModalWords}>
+                {usedWords.map((word) => word.wort).join(' · ') || 'Noch keine Wörter'}
+              </Text>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {activeWord ? (
         <View style={styles.wordMeaningOverlay}>
@@ -298,17 +594,62 @@ function StoryActivity({ words, onExit }) {
                 : activeWord.word.wort}
             </Text>
             {activeWord.pinned ? (
-              <Pressable onPress={() => setActiveWord(null)} hitSlop={8}>
+              <Pressable
+                onPress={() => {
+                  wordMeaningRequest.current += 1;
+                  setActiveWord(null);
+                }}
+                hitSlop={8}
+              >
                 <Ionicons name="close" size={20} color={colors.textMuted} />
               </Pressable>
             ) : null}
           </View>
-          <Text style={styles.wordMeaningText}>{activeWord.word.bedeutung}</Text>
+          {activeWord.loading ? (
+            <View style={styles.translationLoading}>
+              <ActivityIndicator size="small" color={colors.misc.text} />
+              <Text style={styles.translationLoadingText}>Bedeutung wird geladen…</Text>
+            </View>
+          ) : activeWord.error ? (
+            <Text style={styles.translationError}>{activeWord.error}</Text>
+          ) : (
+            <Text style={styles.wordMeaningText}>{activeWord.word.bedeutung}</Text>
+          )}
           {activeWord.word.notizen ? (
             <Text style={styles.wordMeaningNotes} numberOfLines={3}>
               {activeWord.word.notizen}
             </Text>
           ) : null}
+        </View>
+      ) : null}
+
+      {translation ? (
+        <View style={styles.wordMeaningOverlay}>
+          <View style={styles.wordMeaningHeader}>
+            <Text style={styles.translationOverlayLabel}>DE → EN</Text>
+            <Pressable
+              onPress={() => {
+                translationRequest.current += 1;
+                setTranslation(null);
+              }}
+              hitSlop={8}
+            >
+              <Ionicons name="close" size={20} color={colors.textMuted} />
+            </Pressable>
+          </View>
+          <Text style={styles.translationSource} numberOfLines={3}>
+            {translation.source}
+          </Text>
+          {translation.loading ? (
+            <View style={styles.translationLoading}>
+              <ActivityIndicator size="small" color={colors.misc.text} />
+              <Text style={styles.translationLoadingText}>Wird übersetzt…</Text>
+            </View>
+          ) : (
+            <Text style={translation.error ? styles.translationError : styles.wordMeaningText}>
+              {translation.error || translation.text}
+            </Text>
+          )}
         </View>
       ) : null}
     </View>
@@ -513,6 +854,171 @@ function ArtikelGame({ words, onExit }) {
   );
 }
 
+function normalizeAnswer(value) {
+  return value
+    .trim()
+    .toLocaleLowerCase('de-DE')
+    .replace(/^(der|die|das)\s+/, '')
+    .replace(/[.!?,;:]/g, '');
+}
+
+function WordQuest({ words, onExit }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const vocabulary = useMemo(
+    () => words.filter((word) => word.wort && word.bedeutung),
+    [words],
+  );
+  const [queue, setQueue] = useState(() => shuffle(vocabulary));
+  const [answer, setAnswer] = useState('');
+  const [result, setResult] = useState(null);
+  const [xp, setXp] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
+  const [completed, setCompleted] = useState(0);
+  const [hint, setHint] = useState(false);
+
+  const current = queue[0];
+  const target = current?.wort ?? '';
+  const targetWithoutArticle = normalizeAnswer(target);
+
+  if (!current && completed === 0) {
+    return (
+      <EmptyState
+        message="Du brauchst mindestens ein gespeichertes Wort mit Bedeutung für Word Quest."
+        onExit={onExit}
+      />
+    );
+  }
+
+  const checkAnswer = () => {
+    if (!answer.trim() || result) return;
+    const correct = normalizeAnswer(answer) === targetWithoutArticle;
+    setResult(correct ? 'correct' : 'wrong');
+    if (correct) {
+      const nextStreak = streak + 1;
+      setStreak(nextStreak);
+      setBestStreak((best) => Math.max(best, nextStreak));
+      setXp((value) => value + (hint ? 5 : 10) + Math.min(nextStreak * 2, 10));
+    } else {
+      setStreak(0);
+      setMistakes((value) => value + 1);
+    }
+  };
+
+  const nextWord = () => {
+    const rest = queue.slice(1);
+    // Missed words return quickly. Correct words go to the back of the queue,
+    // so the session continues until the player chooses to leave.
+    if (result === 'wrong') {
+      const insertAt = Math.min(2, rest.length);
+      rest.splice(insertAt, 0, current);
+    } else {
+      setCompleted((value) => value + 1);
+      rest.push(current);
+    }
+    setQueue(rest);
+    setAnswer('');
+    setResult(null);
+    setHint(false);
+  };
+
+  const displayedWord = current.artikel
+    ? `${current.artikel} ${current.wort}`
+    : current.wort;
+
+  return (
+    <View style={styles.gameArea}>
+      <View style={styles.scoreRow}>
+        <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
+          <Ionicons name="chevron-back" size={20} color={colors.textDark} />
+          <Text style={styles.exitText}>Spiele</Text>
+        </Pressable>
+        <View style={styles.questStats}>
+          <Text style={styles.questStat}>🔥 {streak}</Text>
+          <Text style={styles.questStat}>⚡ {xp} XP</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.gameBody}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.questionLabel}>Runde {completed + mistakes + 1} · Endlosmodus</Text>
+        <View style={styles.questPromptCard}>
+          <Text style={styles.questPromptLabel}>Wie heißt dieses Wort auf Deutsch?</Text>
+          <Text style={styles.questMeaning}>{current.bedeutung}</Text>
+          {hint ? (
+            <Text style={styles.questHint}>
+              Hinweis: {targetWithoutArticle.charAt(0).toLocaleUpperCase('de-DE')}
+              {' •'.repeat(Math.max(targetWithoutArticle.length - 1, 0))}
+              {current.artikel ? ` · Artikel: ${current.artikel}` : ''}
+            </Text>
+          ) : null}
+        </View>
+
+        <TextInput
+          value={answer}
+          onChangeText={setAnswer}
+          onSubmitEditing={checkAnswer}
+          editable={!result}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="Deine Antwort …"
+          placeholderTextColor={colors.textMuted}
+          accessibilityLabel="Deine Antwort"
+          style={[
+            styles.questInput,
+            result === 'correct' && styles.questInputCorrect,
+            result === 'wrong' && styles.questInputWrong,
+          ]}
+        />
+
+        {result ? (
+          <View
+            style={[
+              styles.questFeedback,
+              { backgroundColor: result === 'correct' ? GOOD.bg : BAD.bg },
+            ]}
+          >
+            <Ionicons
+              name={result === 'correct' ? 'checkmark-circle' : 'refresh-circle'}
+              size={22}
+              color={result === 'correct' ? GOOD.text : BAD.text}
+            />
+            <Text
+              style={[
+                styles.questFeedbackText,
+                { color: result === 'correct' ? GOOD.text : BAD.text },
+              ]}
+            >
+              {result === 'correct'
+                ? `Richtig! +${(hint ? 5 : 10) + Math.min(streak * 2, 10)} XP`
+                : `Fast! Richtig ist „${displayedWord}“. Das Wort kommt gleich noch einmal.`}
+            </Text>
+          </View>
+        ) : (
+          <Pressable style={styles.questHintButton} onPress={() => setHint(true)}>
+            <Ionicons name="bulb-outline" size={18} color={colors.textMuted} />
+            <Text style={styles.questHintButtonText}>
+              {hint ? 'Hinweis eingeblendet' : 'Hinweis (-5 XP)'}
+            </Text>
+          </Pressable>
+        )}
+
+        <Pressable
+          style={[styles.nextButton, !answer.trim() && !result && styles.buttonDisabled]}
+          onPress={result ? nextWord : checkAnswer}
+          disabled={!answer.trim() && !result}
+        >
+          <Text style={styles.nextButtonText}>{result ? 'Weiter' : 'Antwort prüfen'}</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
 export default function GamesView({ words }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -522,9 +1028,26 @@ export default function GamesView({ words }) {
   if (game === 'artikel') return <ArtikelGame words={words} onExit={() => setGame(null)} />;
   if (game === 'flashcards') return <Flashcards words={words} onExit={() => setGame(null)} />;
   if (game === 'story') return <StoryActivity words={words} onExit={() => setGame(null)} />;
+  if (game === 'quest') return <WordQuest words={words} onExit={() => setGame(null)} />;
 
   return (
     <ScrollView contentContainerStyle={styles.menu}>
+      <Pressable style={[styles.menuCard, styles.questMenuCard]} onPress={() => setGame('quest')}>
+        <View style={styles.questMenuIcon}>
+          <Ionicons name="flash" size={26} color="#6b4600" />
+        </View>
+        <View style={styles.menuTextWrap}>
+          <View style={styles.questTitleRow}>
+            <Text style={styles.menuTitle}>Word Quest</Text>
+            <Text style={styles.newBadge}>NEU</Text>
+          </View>
+          <Text style={styles.menuSubtitle}>
+            Erinnere dich aktiv, sammle XP und wiederhole schwierige Wörter.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </Pressable>
+
       <Pressable style={styles.menuCard} onPress={() => setGame('meaning')}>
         <View style={[styles.menuIcon, { backgroundColor: colors.das.bg }]}>
           <Ionicons name="bulb" size={26} color={colors.das.text} />
@@ -592,6 +1115,33 @@ const makeStyles = (colors) => StyleSheet.create({
     padding: 16,
     gap: 14,
   },
+  questMenuCard: {
+    borderColor: '#d6a72c',
+    borderWidth: 1.5,
+  },
+  questMenuIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffe9a8',
+  },
+  questTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  newBadge: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: '#ffe9a8',
+    color: '#6b4600',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    fontSize: 9,
+    fontWeight: '900',
+  },
   menuIcon: {
     width: 48,
     height: 48,
@@ -638,6 +1188,154 @@ const makeStyles = (colors) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: colors.textMuted,
+  },
+  questStats: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  questStat: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textDark,
+  },
+  questProgressTrack: {
+    height: 8,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: colors.border,
+    marginBottom: 18,
+  },
+  questProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#d6a72c',
+  },
+  questPromptCard: {
+    backgroundColor: colors.headerBg,
+    borderRadius: 18,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  questPromptLabel: {
+    color: '#cfc9bd',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  questMeaning: {
+    color: '#fff',
+    fontSize: 25,
+    lineHeight: 32,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  questHint: {
+    marginTop: 16,
+    color: '#ffe9a8',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  questInput: {
+    minHeight: 56,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.cardBg,
+    color: colors.textDark,
+    paddingHorizontal: 16,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  questInputCorrect: {
+    borderColor: GOOD.border,
+  },
+  questInputWrong: {
+    borderColor: BAD.border,
+  },
+  questHintButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 13,
+  },
+  questHintButtonText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  questFeedback: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 12,
+    padding: 13,
+    marginTop: 12,
+  },
+  questFeedbackText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  buttonDisabled: {
+    opacity: 0.45,
+  },
+  questComplete: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 40,
+  },
+  questTrophy: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffe9a8',
+    marginBottom: 18,
+  },
+  questCompleteTitle: {
+    color: colors.textDark,
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  questCompleteSubtitle: {
+    color: colors.textMuted,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginTop: 8,
+    maxWidth: 320,
+  },
+  questSummaryRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginVertical: 24,
+  },
+  questSummaryCard: {
+    minWidth: 120,
+    alignItems: 'center',
+    borderRadius: 14,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+  },
+  questSummaryValue: {
+    color: colors.textDark,
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  questSummaryLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
   },
   questionLabel: {
     fontSize: 13,
@@ -750,6 +1448,30 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 150,
   },
+  storyResetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  storyResetText: {
+    color: colors.misc.text,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  storyProgressLink: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 12,
+    paddingVertical: 7,
+  },
+  storyProgressLinkText: {
+    color: colors.misc.text,
+    fontSize: 13,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
   storyLoading: {
     flex: 1,
     alignItems: 'center',
@@ -810,10 +1532,56 @@ const makeStyles = (colors) => StyleSheet.create({
     fontSize: 17,
     lineHeight: 28,
   },
+  storyClickableWord: {
+    color: colors.textDark,
+  },
   storyInteractiveWord: {
     color: colors.misc.text,
     fontWeight: '800',
     textDecorationLine: 'underline',
+    textDecorationStyle: 'solid',
+  },
+  storyTranslatableSentence: {
+    textDecorationLine: 'underline',
+    textDecorationStyle: 'dotted',
+    textDecorationColor: colors.misc.text,
+  },
+  storySelectedText: {
+    color: colors.textDark,
+    backgroundColor: colors.misc.bg,
+    fontWeight: '800',
+    textDecorationLine: 'none',
+  },
+  storyTranslateToggle: {
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+    borderWidth: 1.5,
+    borderColor: colors.misc.text,
+    borderRadius: 999,
+    backgroundColor: colors.misc.bg,
+  },
+  storyTranslateToggleActive: {
+    backgroundColor: colors.misc.text,
+  },
+  storyTranslateToggleText: {
+    color: colors.misc.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  storyTranslateToggleTextActive: {
+    color: colors.cardBg,
+  },
+  storyTranslateHint: {
+    marginTop: -2,
+    marginBottom: 12,
+    color: colors.textMuted,
+    fontSize: 13,
+    textAlign: 'right',
   },
   storyGenerateButton: {
     flexDirection: 'row',
@@ -834,6 +1602,60 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.misc.text,
     fontSize: 15,
     fontWeight: '800',
+  },
+  storySessionComplete: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 18,
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: GOOD.bg,
+  },
+  storySessionCompleteText: {
+    flex: 1,
+    color: GOOD.text,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  storyModalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.48)',
+  },
+  storyModalCard: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '78%',
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: colors.cardBg,
+  },
+  storyModalTitle: {
+    color: colors.textDark,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  storyModalScroll: {
+    marginTop: 8,
+  },
+  storyModalSection: {
+    marginTop: 16,
+    marginBottom: 7,
+    color: colors.textDark,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  storyModalWords: {
+    color: colors.textMuted,
+    fontSize: 15,
+    lineHeight: 24,
   },
   wordMeaningOverlay: {
     position: 'absolute',
@@ -873,6 +1695,36 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
     lineHeight: 18,
+  },
+  translationOverlayLabel: {
+    color: colors.misc.text,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  translationSource: {
+    marginTop: 7,
+    color: colors.textMuted,
+    fontSize: 13,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  translationLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  translationLoadingText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  translationError: {
+    marginTop: 6,
+    color: colors.die.text,
+    fontSize: 14,
+    fontWeight: '700',
   },
   option: {
     flexDirection: 'row',
