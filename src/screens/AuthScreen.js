@@ -23,13 +23,17 @@ const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: '
 export default function AuthScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { login, register, loginWithGoogle } = useAuth();
+  const { login, register, verifyEmail, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [formError, setFormError] = useState('');
 
   const [request, response, promptAsync] = useGoogleIdTokenRequest();
 
@@ -38,28 +42,73 @@ export default function AuthScreen() {
       setGoogleSubmitting(true);
       loginWithGoogle(response.params.id_token)
         .catch((err) => {
-          Alert.alert('Google sign-in failed', err.response?.data?.error || err.message);
+          setFormError(
+            err.response?.data?.error || err.message || 'Google sign-in failed.',
+          );
         })
         .finally(() => setGoogleSubmitting(false));
     }
   }, [response, loginWithGoogle]);
 
   const submit = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Missing info', 'Email and password are required.');
+    if (mode === 'verify') {
+      if (!/^\d{6}$/.test(verificationCode.trim())) {
+        setFormError('Enter the six-digit code from your email.');
+        return;
+      }
+      setFormError('');
+      setSubmitting(true);
+      try {
+        await verifyEmail({
+          email: verificationEmail,
+          code: verificationCode.trim(),
+        });
+      } catch (err) {
+        setFormError(
+          err.response?.data?.error || err.message || 'Email verification failed.',
+        );
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
+
+    if (!email.trim() || !password) {
+      setFormError('Email and password are required.');
+      return;
+    }
+    setFormError('');
     setSubmitting(true);
     try {
       if (mode === 'login') {
         await login({ email: email.trim(), password });
       } else {
-        await register({ email: email.trim(), password, name: name.trim() });
+        const result = await register({ email: email.trim(), password, name: name.trim() });
+        setVerificationEmail(result.email);
+        setVerificationCode('');
+        setMode('verify');
       }
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.error || err.message);
+      setFormError(
+        err.response?.data?.error || err.message || 'Something went wrong. Please try again.',
+      );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const resendVerificationCode = async () => {
+    setFormError('');
+    setResending(true);
+    try {
+      await register({ email: email.trim(), password, name: name.trim() });
+      Alert.alert('Code sent', `A new verification code was sent to ${verificationEmail}.`);
+    } catch (err) {
+      setFormError(
+        err.response?.data?.error || err.message || 'The code could not be resent.',
+      );
+    } finally {
+      setResending(false);
     }
   };
 
@@ -68,10 +117,14 @@ export default function AuthScreen() {
       <View style={styles.content}>
         <Text style={styles.title}>Wordcontrol</Text>
         <Text style={styles.subtitle}>
-          {mode === 'login' ? 'Log in to your account' : 'Create an account'}
+          {mode === 'login'
+            ? 'Log in to your account'
+            : mode === 'register'
+              ? 'Create an account'
+              : `Enter the code sent to ${verificationEmail}`}
         </Text>
 
-        {mode === 'register' && (
+        {mode === 'register' ? (
           <TextInput
             style={styles.input}
             placeholder="Name"
@@ -80,45 +133,84 @@ export default function AuthScreen() {
             onChangeText={setName}
             autoCapitalize="words"
           />
+        ) : null}
+        {mode === 'verify' ? (
+          <TextInput
+            style={[styles.input, styles.codeInput]}
+            placeholder="000000"
+            placeholderTextColor={colors.placeholder}
+            value={verificationCode}
+            onChangeText={(value) => setVerificationCode(value.replace(/\D/g, '').slice(0, 6))}
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            maxLength={6}
+          />
+        ) : (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={colors.placeholder}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={colors.placeholder}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+          </>
         )}
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={colors.placeholder}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={colors.placeholder}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-        />
+
+        {formError ? (
+          <View style={styles.errorBox} accessibilityRole="alert">
+            <Text style={styles.errorText}>{formError}</Text>
+          </View>
+        ) : null}
 
         <OutlinedButton
-          title={mode === 'login' ? 'Log In' : 'Sign Up'}
-          icon={mode === 'login' ? 'login' : 'person-add-alt'}
+          title={mode === 'login' ? 'Log In' : mode === 'register' ? 'Send Code' : 'Verify Email'}
+          icon={mode === 'login' ? 'login' : mode === 'register' ? 'mail-outline' : 'checkmark-circle-outline'}
           onPress={submit}
           disabled={submitting}
           loading={submitting}
           style={styles.primaryButton}
         />
 
-        <Pressable onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
+        <Pressable
+          onPress={() => {
+            setFormError('');
+            setMode(mode === 'login' ? 'register' : 'login');
+          }}
+        >
           <Text style={styles.switchModeText}>
             {mode === 'login'
               ? "Don't have an account? Sign up"
-              : 'Already have an account? Log in'}
+              : mode === 'register'
+                ? 'Already have an account? Log in'
+                : 'Back to login'}
           </Text>
         </Pressable>
+        {mode === 'verify' ? (
+          <Pressable
+            onPress={resendVerificationCode}
+            disabled={resending}
+            style={styles.resendButton}
+          >
+            <Text style={styles.switchModeText}>
+              {resending ? 'Sending a new code…' : 'Resend verification code'}
+            </Text>
+          </Pressable>
+        ) : null}
 
-        {isGoogleConfigured && (
+        {isGoogleConfigured && mode !== 'verify' ? (
           <>
             <View style={styles.divider} />
             <Pressable
@@ -133,7 +225,7 @@ export default function AuthScreen() {
               )}
             </Pressable>
           </>
-        )}
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -166,6 +258,28 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textDark,
     marginBottom: 12,
   },
+  codeInput: {
+    textAlign: 'center',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: 8,
+  },
+  errorBox: {
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#c0392b',
+    borderRadius: 9,
+    backgroundColor: '#c0392b18',
+  },
+  errorText: {
+    color: '#c0392b',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
   primaryButton: {
     marginTop: 4,
   },
@@ -178,6 +292,7 @@ const makeStyles = (colors) => StyleSheet.create({
     marginTop: 16,
     fontSize: 14,
   },
+  resendButton: { marginTop: 2 },
   divider: {
     height: 1,
     backgroundColor: colors.border,

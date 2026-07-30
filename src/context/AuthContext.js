@@ -27,7 +27,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const register = useCallback(async (credentials) => {
-    setUser(await authService.register(credentials));
+    return authService.register(credentials);
+  }, []);
+
+  const verifyEmail = useCallback(async (verification) => {
+    setUser(await authService.verifyEmail(verification));
   }, []);
 
   const loginWithGoogle = useCallback(async (idToken) => {
@@ -39,9 +43,30 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    await authService.deleteAccount();
+    setUser(null);
+  }, []);
+
+  const linkGoogle = useCallback(async (idToken) => {
+    const updatedUser = await authService.linkGoogle(idToken);
+    setUser(updatedUser);
+    return updatedUser;
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ user, initializing, login, register, loginWithGoogle, logout }}
+      value={{
+        user,
+        initializing,
+        login,
+        register,
+        verifyEmail,
+        loginWithGoogle,
+        linkGoogle,
+        logout,
+        deleteAccount,
+      }}
     >
       {children}
     </AuthContext.Provider>

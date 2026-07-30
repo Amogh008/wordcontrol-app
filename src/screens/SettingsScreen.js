@@ -1,9 +1,20 @@
-import { useMemo } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { isGoogleConfigured, useGoogleIdTokenRequest } from '../services/googleAuth';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
@@ -13,9 +24,23 @@ function initialsFor(user) {
 }
 
 export default function SettingsScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount, linkGoogle } = useAuth();
   const { colors, scheme, toggleTheme } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [deleting, setDeleting] = useState(false);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
+  const [googleRequest, googleResponse, promptGoogle] = useGoogleIdTokenRequest();
+
+  useEffect(() => {
+    if (googleResponse?.type !== 'success' || !googleResponse.params?.id_token) return;
+    setLinkingGoogle(true);
+    linkGoogle(googleResponse.params.id_token)
+      .then(() => Alert.alert('Google linked', 'You can now sign in using Google.'))
+      .catch((err) => {
+        Alert.alert('Could not link Google', err.response?.data?.error || err.message);
+      })
+      .finally(() => setLinkingGoogle(false));
+  }, [googleResponse, linkGoogle]);
 
   const confirmLogout = () => {
     if (Platform.OS === 'web') {
@@ -31,6 +56,32 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const performAccountDeletion = async () => {
+    setDeleting(true);
+    try {
+      await deleteAccount();
+    } catch (err) {
+      Alert.alert(
+        'Account could not be deleted',
+        err.response?.data?.error ?? err.message ?? 'Please try again.',
+      );
+      setDeleting(false);
+    }
+  };
+
+  const confirmAccountDeletion = () => {
+    const message =
+      'This permanently deletes your account, saved vocabulary, and notes. This cannot be undone.';
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) performAccountDeletion();
+      return;
+    }
+    Alert.alert('Delete account?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete permanently', style: 'destructive', onPress: performAccountDeletion },
+    ]);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
@@ -40,7 +91,7 @@ export default function SettingsScreen() {
         </Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initialsFor(user)}</Text>
@@ -65,6 +116,19 @@ export default function SettingsScreen() {
               <Text style={styles.optionLabel}>Google account</Text>
               <Text style={styles.optionValue}>{user?.googleId ? 'Linked' : 'Not linked'}</Text>
             </View>
+            {!user?.googleId && isGoogleConfigured ? (
+              <Pressable
+                style={[styles.linkButton, linkingGoogle && styles.disabledButton]}
+                onPress={() => promptGoogle()}
+                disabled={!googleRequest || linkingGoogle}
+              >
+                {linkingGoogle ? (
+                  <ActivityIndicator size="small" color={colors.misc.text} />
+                ) : (
+                  <Text style={styles.linkButtonText}>Link Google</Text>
+                )}
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
@@ -89,7 +153,24 @@ export default function SettingsScreen() {
           <Ionicons name="log-out-outline" size={20} color="#c0392b" />
           <Text style={styles.logoutText}>Log out</Text>
         </Pressable>
-      </View>
+        <Pressable
+          style={[styles.deleteButton, deleting && styles.disabledButton]}
+          onPress={confirmAccountDeletion}
+          disabled={deleting}
+        >
+          {deleting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="trash-outline" size={20} color="#fff" />
+          )}
+          <Text style={styles.deleteText}>
+            {deleting ? 'Deleting account…' : 'Delete account'}
+          </Text>
+        </Pressable>
+        <Text style={styles.deleteHelp}>
+          Permanently removes your account, vocabulary, and notes.
+        </Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -105,7 +186,7 @@ const makeStyles = (colors) => StyleSheet.create({
   title: { fontSize: 30 },
   titleBold: { fontFamily: titleFont, fontWeight: '700', color: '#fff' },
   titleItalic: { fontFamily: titleFont, fontStyle: 'italic', color: '#fff' },
-  content: { flex: 1, padding: 20 },
+  content: { padding: 20, paddingBottom: 40 },
   profileCard: {
     alignItems: 'center',
     backgroundColor: colors.cardBg,
@@ -152,6 +233,14 @@ const makeStyles = (colors) => StyleSheet.create({
   optionTextWrap: { flex: 1 },
   optionLabel: { fontSize: 13, color: colors.textMuted },
   optionValue: { fontSize: 15, color: colors.textDark, fontWeight: '600', marginTop: 2 },
+  linkButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.misc.text,
+    borderRadius: 999,
+  },
+  linkButtonText: { color: colors.misc.text, fontSize: 12, fontWeight: '800' },
   divider: { height: 1, backgroundColor: colors.border },
   logoutButton: {
     flexDirection: 'row',
@@ -166,4 +255,23 @@ const makeStyles = (colors) => StyleSheet.create({
     marginTop: 4,
   },
   logoutText: { color: '#c0392b', fontSize: 16, fontWeight: '700' },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#c0392b',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginTop: 12,
+  },
+  disabledButton: { opacity: 0.6 },
+  deleteText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  deleteHelp: {
+    marginTop: 8,
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
 });

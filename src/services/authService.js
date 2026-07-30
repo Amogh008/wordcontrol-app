@@ -16,6 +16,11 @@ export { loadToken };
 
 export async function register({ email, password, name }) {
   const { data } = await authClient.post('/register', { email, password, name });
+  return data;
+}
+
+export async function verifyEmail({ email, code }) {
+  const { data } = await authClient.post('/verify-email', { email, code });
   await setToken(data.token);
   return data.user;
 }
@@ -39,4 +44,14 @@ export async function getCurrentUser() {
 
 export async function logout() {
   await setToken(null);
+}
+
+export async function deleteAccount() {
+  await authClient.delete('/me');
+  await setToken(null);
+}
+
+export async function linkGoogle(idToken) {
+  const { data } = await authClient.post('/link-google', { idToken });
+  return data.user;
 }
