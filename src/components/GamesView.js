@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { selectableArticles } from '../theme/colors';
 import { useTheme } from '../context/ThemeContext';
+import { generateStory } from '../services/wordsService';
 
 const GOOD = { text: '#2f9e44', bg: '#d3f9d8', border: '#2f9e44' };
 const BAD = { text: '#c92a2a', bg: '#ffe3e3', border: '#c92a2a' };
@@ -125,6 +126,191 @@ function Flashcards({ words, onExit }) {
           <Text style={styles.flashcardNextText}>Nächste zufällige Karte</Text>
         </Pressable>
       </ScrollView>
+    </View>
+  );
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function InteractiveParagraph({ paragraph, words, onHover, onHoverEnd, onPress }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const lookup = useMemo(
+    () =>
+      new Map(
+        words
+          .filter((word) => word.wort)
+          .map((word) => [word.wort.toLocaleLowerCase('de-DE'), word]),
+      ),
+    [words],
+  );
+  const parts = useMemo(() => {
+    const terms = [...lookup.values()]
+      .map((word) => word.wort)
+      .sort((a, b) => b.length - a.length)
+      .map(escapeRegex);
+    if (terms.length === 0) return [paragraph];
+    return paragraph.split(new RegExp(`(${terms.join('|')})`, 'giu'));
+  }, [lookup, paragraph]);
+
+  return (
+    <Text style={styles.storyParagraph}>
+      {parts.map((part, index) => {
+        const word = lookup.get(part.toLocaleLowerCase('de-DE'));
+        if (!word) return <Text key={`${index}-${part}`}>{part}</Text>;
+        return (
+          <Text
+            key={`${index}-${part}`}
+            style={styles.storyInteractiveWord}
+            onPress={() => onPress(word)}
+            onMouseEnter={() => onHover(word)}
+            onMouseLeave={onHoverEnd}
+          >
+            {part}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
+
+function StoryActivity({ words, onExit }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const vocabulary = useMemo(
+    () => words.filter((word) => word.wort && word.bedeutung),
+    [words],
+  );
+  const [story, setStory] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [activeWord, setActiveWord] = useState(null);
+
+  const createStory = async () => {
+    if (vocabulary.length === 0 || loading) return;
+    setLoading(true);
+    setError('');
+    setActiveWord(null);
+    try {
+      setStory(await generateStory());
+    } catch (err) {
+      setError(err.response?.data?.error ?? err.message ?? 'Die Geschichte konnte nicht erstellt werden.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    createStory();
+    // Generate only when this activity opens; regeneration is explicit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (vocabulary.length === 0) {
+    return (
+      <EmptyState
+        message="Speichere mindestens ein Wort mit Bedeutung, um eine Geschichte zu erstellen."
+        onExit={onExit}
+      />
+    );
+  }
+
+  const handleHover = (word) => {
+    setActiveWord((current) => (current?.pinned ? current : { word, pinned: false }));
+  };
+  const handleHoverEnd = () => {
+    setActiveWord((current) => (current?.pinned ? current : null));
+  };
+  const handleWordPress = (word) => {
+    const id = word.id ?? word._id ?? word.wort;
+    setActiveWord((current) => {
+      const currentId = current?.word?.id ?? current?.word?._id ?? current?.word?.wort;
+      return current?.pinned && currentId === id ? null : { word, pinned: true };
+    });
+  };
+
+  return (
+    <View style={styles.gameArea}>
+      <View style={styles.scoreRow}>
+        <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
+          <Ionicons name="chevron-back" size={20} color={colors.textDark} />
+          <Text style={styles.exitText}>Spiele</Text>
+        </Pressable>
+        <Text style={styles.scoreText}>{vocabulary.length} Wörter verwendet</Text>
+      </View>
+
+      {loading && !story ? (
+        <View style={styles.storyLoading}>
+          <ActivityIndicator size="large" color={colors.misc.text} />
+          <Text style={styles.storyLoadingText}>KI schreibt deine Geschichte…</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.storyBody}>
+          {error ? (
+            <View style={styles.storyError}>
+              <Text style={styles.storyErrorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {story ? (
+            <View style={styles.storyPaper}>
+              <Text style={styles.storyTitle}>{story.title}</Text>
+              <View style={styles.storyTitleRule} />
+              {story.paragraphs.map((paragraph, index) => (
+                <View key={`${index}-${paragraph.slice(0, 24)}`} style={styles.storyParagraphWrap}>
+                  <InteractiveParagraph
+                    paragraph={paragraph}
+                    words={vocabulary}
+                    onHover={handleHover}
+                    onHoverEnd={handleHoverEnd}
+                    onPress={handleWordPress}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <Pressable
+            style={[styles.storyGenerateButton, loading && styles.storyGenerateButtonDisabled]}
+            onPress={createStory}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.misc.text} />
+            ) : (
+              <Ionicons name="sparkles" size={18} color={colors.misc.text} />
+            )}
+            <Text style={styles.storyGenerateText}>
+              {loading ? 'KI schreibt…' : story ? 'Neue Geschichte mit KI' : 'Erneut versuchen'}
+            </Text>
+          </Pressable>
+        </ScrollView>
+      )}
+
+      {activeWord ? (
+        <View style={styles.wordMeaningOverlay}>
+          <View style={styles.wordMeaningHeader}>
+            <Text style={styles.wordMeaningTitle}>
+              {activeWord.word.artikel
+                ? `${activeWord.word.artikel} ${activeWord.word.wort}`
+                : activeWord.word.wort}
+            </Text>
+            {activeWord.pinned ? (
+              <Pressable onPress={() => setActiveWord(null)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={colors.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+          <Text style={styles.wordMeaningText}>{activeWord.word.bedeutung}</Text>
+          {activeWord.word.notizen ? (
+            <Text style={styles.wordMeaningNotes} numberOfLines={3}>
+              {activeWord.word.notizen}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -335,6 +521,7 @@ export default function GamesView({ words }) {
   if (game === 'meaning') return <MeaningGame words={words} onExit={() => setGame(null)} />;
   if (game === 'artikel') return <ArtikelGame words={words} onExit={() => setGame(null)} />;
   if (game === 'flashcards') return <Flashcards words={words} onExit={() => setGame(null)} />;
+  if (game === 'story') return <StoryActivity words={words} onExit={() => setGame(null)} />;
 
   return (
     <ScrollView contentContainerStyle={styles.menu}>
@@ -368,6 +555,19 @@ export default function GamesView({ words }) {
           <Text style={styles.menuTitle}>Lernkarten</Text>
           <Text style={styles.menuSubtitle}>
             Ziehe zufällige Karten mit Wort, Bedeutung und Notizen.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </Pressable>
+
+      <Pressable style={styles.menuCard} onPress={() => setGame('story')}>
+        <View style={[styles.menuIcon, { backgroundColor: colors.die.bg }]}>
+          <Ionicons name="book" size={26} color={colors.die.text} />
+        </View>
+        <View style={styles.menuTextWrap}>
+          <Text style={styles.menuTitle}>Meine Geschichte</Text>
+          <Text style={styles.menuSubtitle}>
+            KI schreibt eine Geschichte mit all deinen gespeicherten Wörtern.
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
@@ -545,6 +745,134 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.misc.text,
     fontSize: 15,
     fontWeight: '800',
+  },
+  storyBody: {
+    paddingTop: 8,
+    paddingBottom: 150,
+  },
+  storyLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  storyLoadingText: {
+    color: colors.textMuted,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  storyError: {
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.die.text,
+    borderRadius: 10,
+    backgroundColor: colors.die.bg,
+  },
+  storyErrorText: {
+    color: colors.die.text,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  storyPaper: {
+    paddingHorizontal: 22,
+    paddingVertical: 26,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: colors.cardBg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 9,
+    elevation: 4,
+  },
+  storyTitle: {
+    color: colors.textDark,
+    fontFamily: 'Georgia',
+    fontSize: 27,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  storyTitleRule: {
+    alignSelf: 'center',
+    width: 54,
+    height: 2,
+    marginTop: 14,
+    marginBottom: 22,
+    backgroundColor: colors.misc.text,
+  },
+  storyParagraphWrap: {
+    marginBottom: 18,
+  },
+  storyParagraph: {
+    color: colors.textDark,
+    fontSize: 17,
+    lineHeight: 28,
+  },
+  storyInteractiveWord: {
+    color: colors.misc.text,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
+  storyGenerateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    marginTop: 18,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: colors.misc.text,
+    borderRadius: 10,
+    backgroundColor: colors.misc.bg,
+  },
+  storyGenerateButtonDisabled: {
+    opacity: 0.6,
+  },
+  storyGenerateText: {
+    color: colors.misc.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  wordMeaningOverlay: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 14,
+    zIndex: 50,
+    elevation: 10,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: colors.misc.text,
+    borderRadius: 14,
+    backgroundColor: colors.cardBg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+  },
+  wordMeaningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  wordMeaningTitle: {
+    color: colors.misc.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  wordMeaningText: {
+    marginTop: 4,
+    color: colors.textDark,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  wordMeaningNotes: {
+    marginTop: 8,
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
   },
   option: {
     flexDirection: 'row',

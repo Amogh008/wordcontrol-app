@@ -33,3 +33,8 @@ export async function checkGrammar({ sentence }) {
   const { data } = await apiClient.post('/grammar', { sentence });
   return data;
 }
+
+export async function generateStory() {
+  const { data } = await apiClient.post('/story');
+  return data;
+}
