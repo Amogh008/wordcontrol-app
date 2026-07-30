@@ -35,7 +35,7 @@ export const darkColors = {
 };
 
 // Kept for any code that hasn't migrated to useTheme() yet.
-export const colors = lightColors;
+export const colors = darkColors;
 
 export const articles = ['der', 'die', 'das', 'misc'];
 

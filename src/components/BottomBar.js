@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -14,7 +14,7 @@ function NeonLine({ styles }) {
   );
 }
 
-function TabItem({ icon, label, active, onPress, colors, styles }) {
+function TabItem({ icon, iconSize, label, active, onPress, colors, styles }) {
   const tint = active ? colors.textDark : colors.textMuted;
   return (
     <Pressable
@@ -27,9 +27,11 @@ function TabItem({ icon, label, active, onPress, colors, styles }) {
       <View style={styles.selectionFrame}>
         {active ? <NeonLine styles={styles} /> : <View style={styles.neonPlaceholder} />}
         <View style={styles.tabContent}>
-          <Ionicons name={active ? icon : `${icon}-outline`} size={22} color={tint} />
+          <Ionicons name={active ? icon : `${icon}-outline`} size={iconSize} color={tint} />
           <Text
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
             style={[styles.label, { color: tint, fontWeight: active ? '800' : '600' }]}
           >
             {label}
@@ -43,13 +45,26 @@ function TabItem({ icon, label, active, onPress, colors, styles }) {
 
 export default function BottomBar({ tab, onChange }) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { colors } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const compact = width <= 480;
+  const iconSize = compact ? 17 : 22;
+  const styles = useMemo(() => makeStyles(colors, compact), [colors, compact]);
 
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View
+      style={[
+        styles.bar,
+        {
+          paddingBottom: Math.max(insets.bottom, 8),
+          paddingLeft: Math.max(insets.left, compact ? 10 : 0),
+          paddingRight: Math.max(insets.right, compact ? 10 : 0),
+        },
+      ]}
+    >
       <TabItem
         icon="book"
+        iconSize={iconSize}
         label="Wörterbuch"
         active={tab === 'words'}
         onPress={() => onChange('words')}
@@ -58,6 +73,7 @@ export default function BottomBar({ tab, onChange }) {
       />
       <TabItem
         icon="language"
+        iconSize={iconSize}
         label="Übersetzer"
         active={tab === 'translate'}
         onPress={() => onChange('translate')}
@@ -66,6 +82,7 @@ export default function BottomBar({ tab, onChange }) {
       />
       <TabItem
         icon="library"
+        iconSize={iconSize}
         label="Dictionary"
         active={tab === 'dictionary'}
         onPress={() => onChange('dictionary')}
@@ -74,6 +91,7 @@ export default function BottomBar({ tab, onChange }) {
       />
       <TabItem
         icon="school"
+        iconSize={iconSize}
         label="Grammatik"
         active={tab === 'grammar'}
         onPress={() => onChange('grammar')}
@@ -82,6 +100,7 @@ export default function BottomBar({ tab, onChange }) {
       />
       <TabItem
         icon="document-text"
+        iconSize={iconSize}
         label="Notizen"
         active={tab === 'notes'}
         onPress={() => onChange('notes')}
@@ -90,6 +109,7 @@ export default function BottomBar({ tab, onChange }) {
       />
       <TabItem
         icon="game-controller"
+        iconSize={iconSize}
         label="Spiele"
         active={tab === 'games'}
         onPress={() => onChange('games')}
@@ -98,6 +118,7 @@ export default function BottomBar({ tab, onChange }) {
       />
       <TabItem
         icon="settings"
+        iconSize={iconSize}
         label="Einstellungen"
         active={tab === 'settings'}
         onPress={() => onChange('settings')}
@@ -108,13 +129,13 @@ export default function BottomBar({ tab, onChange }) {
   );
 }
 
-const makeStyles = (colors) => StyleSheet.create({
+const makeStyles = (colors, compact) => StyleSheet.create({
   bar: {
     flexDirection: 'row',
     backgroundColor: colors.cardBg,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTop: 8,
+    paddingTop: compact ? 5 : 8,
   },
   item: {
     flex: 1,
@@ -125,23 +146,23 @@ const makeStyles = (colors) => StyleSheet.create({
     opacity: 0.65,
   },
   selectionFrame: {
-    height: 48,
+    height: compact ? 41 : 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: compact ? 2 : 5,
   },
   tabContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: compact ? 2 : 3,
   },
   neonPlaceholder: {
-    width: 2,
+    width: compact ? 1 : 2,
   },
   neonLine: {
-    width: 4,
-    height: 48,
+    width: compact ? 2 : 4,
+    height: compact ? 41 : 48,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#55dfff',
@@ -162,7 +183,7 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   neonCore: {
     width: 1.5,
-    height: 40,
+    height: compact ? 33 : 40,
     backgroundColor: '#63ddff',
   },
   neonBottomTip: {
@@ -176,6 +197,8 @@ const makeStyles = (colors) => StyleSheet.create({
     borderTopColor: '#63ddff',
   },
   label: {
-    fontSize: 10,
+    fontSize: compact ? 8 : 10,
+    maxWidth: compact ? 42 : 70,
+    textAlign: 'center',
   },
 });

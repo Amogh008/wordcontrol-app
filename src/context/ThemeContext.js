@@ -21,7 +21,7 @@ const store = Platform.OS === 'web'
 const ThemeContext = createContext(null);
 
 export function ThemeProvider({ children }) {
-  const [scheme, setScheme] = useState('light');
+  const [scheme, setScheme] = useState('dark');
 
   useEffect(() => {
     (async () => {
@@ -29,7 +29,7 @@ export function ThemeProvider({ children }) {
         const saved = await store.getItem(THEME_KEY);
         if (saved === 'dark' || saved === 'light') setScheme(saved);
       } catch (err) {
-        // Ignore - default to light.
+        // Ignore - default to dark.
       }
     })();
   }, []);

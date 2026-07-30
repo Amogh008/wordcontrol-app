@@ -281,16 +281,17 @@ export default function NotesScreen() {
           setDetailNote(null);
         }}
       >
-        <Pressable
-          style={styles.modalOverlay}
+        <View style={styles.modalOverlay}>
+          <Pressable
+          style={styles.modalBackdrop}
           onPress={() => {
             if (!deleting) {
               setConfirmingDelete(false);
               setDetailNote(null);
             }
           }}
-        >
-          <Pressable style={styles.modalCard} onPress={() => {}}>
+          />
+          <View style={styles.modalCard}>
             {detailNote ? (
               confirmingDelete ? (
                 <>
@@ -337,7 +338,12 @@ export default function NotesScreen() {
                     <Ionicons name="trash" size={22} color={colors.die.text} />
                   </Pressable>
                 </View>
-                <ScrollView style={styles.modalScroll}>
+                <ScrollView
+                  style={styles.modalScroll}
+                  contentContainerStyle={styles.modalScrollContent}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator
+                >
                   <Text style={styles.modalContent}>{detailNote.content}</Text>
                 </ScrollView>
                 <Pressable
@@ -352,8 +358,8 @@ export default function NotesScreen() {
               </>
               )
             ) : null}
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -561,6 +567,9 @@ const makeStyles = (colors) => StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
   modalCard: {
     backgroundColor: colors.cardBg,
     borderRadius: 16,
@@ -580,7 +589,11 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textDark,
   },
   modalScroll: {
+    flexShrink: 1,
     marginTop: 12,
+  },
+  modalScrollContent: {
+    paddingBottom: 4,
   },
   modalContent: {
     fontSize: 15,

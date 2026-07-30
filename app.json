@@ -4,8 +4,9 @@
     "slug": "wordcontrol",
     "version": "1.0.0",
     "orientation": "portrait",
+    "scheme": "com.anonymous.wordcontrol",
     "icon": "./assets/icon_wordcontrol.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/icon_wordcontrol.png",
       "supportsTablet": true
@@ -24,7 +25,16 @@
     "plugins": [
       "expo-font",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon_wordcontrol.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#121110"
+        }
+      ]
     ]
   }
 }
