@@ -35,12 +35,12 @@ export async function checkGrammar({ sentence }) {
   return data;
 }
 
-export async function generateStory({ wordIds } = {}) {
-  const { data } = await apiClient.post('/story', { wordIds });
+export async function generateStory({ wordIds, level } = {}) {
+  const { data } = await apiClient.post('/story', { wordIds, level });
   return data;
 }
 
-export function streamStory({ wordIds, onDelta }) {
+export function streamStory({ wordIds, level, onDelta }) {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     let processedLength = 0;
@@ -90,6 +90,6 @@ export function streamStory({ wordIds, onDelta }) {
         reject(err);
       }
     };
-    request.send(JSON.stringify({ wordIds }));
+    request.send(JSON.stringify({ wordIds, level }));
   });
 }

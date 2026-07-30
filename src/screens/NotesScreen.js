@@ -16,7 +16,6 @@ import { useTheme } from '../context/ThemeContext';
 import OutlinedButton from '../components/OutlinedButton';
 import {
   addNote,
-  clearNotes,
   deleteNote,
   formatNoteContent,
   getNotes,
@@ -55,6 +54,8 @@ export default function NotesScreen() {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detailNote, setDetailNote] = useState(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -127,48 +128,25 @@ export default function NotesScreen() {
     setEditingId(note.id);
     setTitle(note.title ?? '');
     setContent(note.content ?? '');
+    setConfirmingDelete(false);
     setDetailNote(null);
     setMode('add');
   };
 
-  const handleDelete = (id, onDeleted) => {
-    Alert.alert('Notiz löschen?', 'This note will be removed.', [
-      { text: 'Abbrechen', style: 'cancel' },
-      {
-        text: 'Löschen',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteNote(id);
-            await load();
-            onDeleted?.();
-          } catch (err) {
-            const msg = err.response?.data?.error ?? err.message ?? 'Failed to delete note.';
-            Alert.alert('Fehler', msg);
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleClearAll = () => {
-    if (notes.length === 0) return;
-    Alert.alert('Alle Notizen löschen?', 'This removes every saved note. This cannot be undone.', [
-      { text: 'Abbrechen', style: 'cancel' },
-      {
-        text: 'Alle löschen',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await clearNotes();
-            await load();
-          } catch (err) {
-            const msg = err.response?.data?.error ?? err.message ?? 'Failed to clear notes.';
-            Alert.alert('Fehler', msg);
-          }
-        },
-      },
-    ]);
+  const handleDelete = async (id) => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteNote(id);
+      setDetailNote(null);
+      setConfirmingDelete(false);
+      await load();
+    } catch (err) {
+      const msg = err.response?.data?.error ?? err.message ?? 'Failed to delete note.';
+      Alert.alert('Fehler', msg);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -264,12 +242,6 @@ export default function NotesScreen() {
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.listHeaderRow}>
             <Text style={styles.listHeaderText}>GESPEICHERT ({notes.length})</Text>
-            <Pressable style={styles.clearAllButton} onPress={handleClearAll} disabled={notes.length === 0}>
-              <Ionicons name="trash-outline" size={16} color={notes.length === 0 ? colors.textMuted : colors.textDark} />
-              <Text style={[styles.clearAllButtonText, notes.length === 0 && { color: colors.textMuted }]}>
-                Clear All
-              </Text>
-            </Pressable>
           </View>
 
           {loading ? (
@@ -278,7 +250,14 @@ export default function NotesScreen() {
             <Text style={styles.emptyText}>Noch keine Notizen. Füge deine erste Notiz im Tab „Neue Notiz" hinzu!</Text>
           ) : (
             notes.map((note) => (
-              <Pressable key={note.id} style={styles.noteCard} onPress={() => setDetailNote(note)}>
+              <Pressable
+                key={note.id}
+                style={styles.noteCard}
+                onPress={() => {
+                  setConfirmingDelete(false);
+                  setDetailNote(note);
+                }}
+              >
                 <View style={styles.noteCardHeader}>
                   <Text style={styles.noteTitle} numberOfLines={2}>{note.title}</Text>
                   <View style={styles.noteDates}>
@@ -297,12 +276,50 @@ export default function NotesScreen() {
         visible={!!detailNote}
         transparent
         animationType="fade"
-        onRequestClose={() => setDetailNote(null)}
+        onRequestClose={() => {
+          setConfirmingDelete(false);
+          setDetailNote(null);
+        }}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setDetailNote(null)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => {
+            if (!deleting) {
+              setConfirmingDelete(false);
+              setDetailNote(null);
+            }
+          }}
+        >
           <Pressable style={styles.modalCard} onPress={() => {}}>
             {detailNote ? (
-              <>
+              confirmingDelete ? (
+                <>
+                  <Text style={styles.deleteConfirmTitle}>Notiz löschen?</Text>
+                  <Text style={styles.deleteConfirmText}>
+                    Diese Notiz wird dauerhaft gelöscht.
+                  </Text>
+                  <View style={styles.deleteConfirmActions}>
+                    <Pressable
+                      style={styles.deleteCancelButton}
+                      onPress={() => setConfirmingDelete(false)}
+                      disabled={deleting}
+                    >
+                      <Text style={styles.deleteCancelText}>Abbrechen</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.deleteConfirmButton, deleting && styles.deleteButtonDisabled]}
+                      onPress={() => handleDelete(detailNote.id)}
+                      disabled={deleting}
+                    >
+                      <Ionicons name="trash" size={18} color="#fff" />
+                      <Text style={styles.deleteConfirmButtonText}>
+                        {deleting ? 'Wird gelöscht…' : 'Löschen'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <>
                 <View style={styles.modalHeaderRow}>
                   <Text style={styles.modalTitle} numberOfLines={2}>{detailNote.title}</Text>
                   <Pressable
@@ -313,7 +330,7 @@ export default function NotesScreen() {
                     <Ionicons name="pencil" size={20} color={colors.misc.text} />
                   </Pressable>
                   <Pressable
-                    onPress={() => handleDelete(detailNote.id, () => setDetailNote(null))}
+                    onPress={() => setConfirmingDelete(true)}
                     hitSlop={10}
                     style={{ marginLeft: 16 }}
                   >
@@ -323,10 +340,17 @@ export default function NotesScreen() {
                 <ScrollView style={styles.modalScroll}>
                   <Text style={styles.modalContent}>{detailNote.content}</Text>
                 </ScrollView>
-                <Pressable style={styles.modalCloseButton} onPress={() => setDetailNote(null)}>
+                <Pressable
+                  style={styles.modalCloseButton}
+                  onPress={() => {
+                    setConfirmingDelete(false);
+                    setDetailNote(null);
+                  }}
+                >
                   <Text style={styles.modalCloseButtonText}>Schließen</Text>
                 </Pressable>
               </>
+              )
             ) : null}
           </Pressable>
         </Pressable>
@@ -480,7 +504,6 @@ const makeStyles = (colors) => StyleSheet.create({
   listHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 10,
   },
   listHeaderText: {
@@ -488,21 +511,6 @@ const makeStyles = (colors) => StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
     color: colors.textMuted,
-  },
-  clearAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  clearAllButtonText: {
-    color: colors.die.text,
-    fontSize: 13,
-    fontWeight: '700',
   },
   emptyText: {
     marginTop: 20,
@@ -590,5 +598,53 @@ const makeStyles = (colors) => StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+  },
+  deleteConfirmTitle: {
+    color: colors.textDark,
+    fontSize: 21,
+    fontWeight: '900',
+  },
+  deleteConfirmText: {
+    marginTop: 8,
+    color: colors.textMuted,
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  deleteConfirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 22,
+  },
+  deleteCancelButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 12,
+  },
+  deleteCancelText: {
+    color: colors.textDark,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderRadius: 10,
+    paddingVertical: 12,
+    backgroundColor: colors.die.text,
+  },
+  deleteButtonDisabled: {
+    opacity: 0.6,
+  },
+  deleteConfirmButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

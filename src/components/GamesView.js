@@ -16,6 +16,11 @@ import { streamStory, translateText } from '../services/wordsService';
 
 const GOOD = { text: '#2f9e44', bg: '#d3f9d8', border: '#2f9e44' };
 const BAD = { text: '#c92a2a', bg: '#ffe3e3', border: '#c92a2a' };
+const STORY_LEVELS = [
+  { id: 'A1', title: 'A1 · Anfänger', description: 'Sehr kurze, einfache Sätze und vertraute Wörter' },
+  { id: 'A2', title: 'A2 · Grundkenntnisse', description: 'Einfache Sätze mit etwas mehr Abwechslung' },
+  { id: 'B1', title: 'B1 · Mittelstufe', description: 'Natürlichere Sätze und eine ausführlichere Handlung' },
+];
 
 function shuffle(arr) {
   const a = [...arr];
@@ -247,7 +252,7 @@ function StoryActivity({ words, onExit }) {
   const [usedWords, setUsedWords] = useState([]);
   const [roundWords, setRoundWords] = useState([]);
   const [showSessionWords, setShowSessionWords] = useState(false);
-  const started = useRef(false);
+  const [level, setLevel] = useState(null);
   const translationRequest = useRef(0);
   const wordMeaningRequest = useRef(0);
   const wordMeaningCache = useRef(new Map());
@@ -263,8 +268,8 @@ function StoryActivity({ words, onExit }) {
     return { title, paragraphs };
   };
 
-  const createStory = async (batch = roundWords) => {
-    if (batch.length === 0 || loading) return;
+  const createStory = async (batch = roundWords, storyLevel = level) => {
+    if (batch.length === 0 || loading || !storyLevel) return;
     setLoading(true);
     setError('');
     setActiveWord(null);
@@ -277,6 +282,7 @@ function StoryActivity({ words, onExit }) {
       let streamedText = '';
       const completedStory = await streamStory({
         wordIds: batch.map((word) => word.id ?? word._id),
+        level: storyLevel,
         onDelta: (text) => {
           streamedText += text;
           setStory(storyFromStreamText(streamedText));
@@ -298,14 +304,6 @@ function StoryActivity({ words, onExit }) {
     }
   };
 
-  useEffect(() => {
-    if (started.current || vocabulary.length === 0) return;
-    started.current = true;
-    createStory(remainingWords.slice(0, 30));
-    // Generate only when this activity opens; regeneration is explicit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const continueSession = () => {
     createStory(remainingWords.slice(0, 30));
   };
@@ -319,7 +317,7 @@ function StoryActivity({ words, onExit }) {
     setStory(null);
     setError('');
     setShowSessionWords(false);
-    createStory(freshQueue.slice(0, 30));
+    setLevel(null);
   };
 
   if (vocabulary.length === 0) {
@@ -328,6 +326,52 @@ function StoryActivity({ words, onExit }) {
         message="Speichere mindestens ein Wort mit Bedeutung, um eine Geschichte zu erstellen."
         onExit={onExit}
       />
+    );
+  }
+
+  if (!level) {
+    return (
+      <View style={styles.gameArea}>
+        <View style={styles.scoreRow}>
+          <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
+            <Ionicons name="chevron-back" size={20} color={colors.textDark} />
+            <Text style={styles.exitText}>Spiele</Text>
+          </Pressable>
+        </View>
+        <View style={styles.storyLevelScreen}>
+          <Ionicons name="book-outline" size={34} color={colors.misc.text} />
+          <Text style={styles.storyLevelTitle}>Wähle dein Sprachniveau</Text>
+          <Text style={styles.storyLevelIntro}>
+            Die Geschichte wird passend zu deinem aktuellen Deutsch-Niveau geschrieben.
+          </Text>
+          <View style={styles.storyLevelOptions}>
+            {STORY_LEVELS.map((option) => (
+              <Pressable
+                key={option.id}
+                style={({ pressed }) => [
+                  styles.storyLevelOption,
+                  pressed && styles.storyLevelOptionPressed,
+                ]}
+                onPress={() => {
+                  setLevel(option.id);
+                  createStory(remainingWords.slice(0, 30), option.id);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${option.title}: ${option.description}`}
+              >
+                <View style={styles.storyLevelBadge}>
+                  <Text style={styles.storyLevelBadgeText}>{option.id}</Text>
+                </View>
+                <View style={styles.storyLevelCopy}>
+                  <Text style={styles.storyLevelOptionTitle}>{option.title}</Text>
+                  <Text style={styles.storyLevelDescription}>{option.description}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
     );
   }
 
@@ -477,12 +521,10 @@ function StoryActivity({ words, onExit }) {
                   translationMode && styles.storyTranslateToggleActive,
                 ]}
                 onPress={toggleTranslationMode}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: translationMode }}
+                accessibilityLabel="Satz übersetzen"
               >
-                <Ionicons
-                  name={translationMode ? 'language' : 'language-outline'}
-                  size={18}
-                  color={translationMode ? colors.cardBg : colors.misc.text}
-                />
                 <Text
                   style={[
                     styles.storyTranslateToggleText,
@@ -491,6 +533,19 @@ function StoryActivity({ words, onExit }) {
                 >
                   Satz übersetzen
                 </Text>
+                <View
+                  style={[
+                    styles.storyTranslateSwitchTrack,
+                    translationMode && styles.storyTranslateSwitchTrackActive,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.storyTranslateSwitchThumb,
+                      translationMode && styles.storyTranslateSwitchThumbActive,
+                    ]}
+                  />
+                </View>
               </Pressable>
               {translationMode ? (
                 <Text style={styles.storyTranslateHint}>
@@ -586,7 +641,17 @@ function StoryActivity({ words, onExit }) {
       </Modal>
 
       {activeWord ? (
-        <View style={styles.wordMeaningOverlay}>
+        <>
+          <Pressable
+            style={styles.storyMeaningDismissLayer}
+            onPress={() => {
+              wordMeaningRequest.current += 1;
+              setActiveWord(null);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Bedeutung schließen"
+          />
+          <View style={styles.wordMeaningOverlay}>
           <View style={styles.wordMeaningHeader}>
             <Text style={styles.wordMeaningTitle}>
               {activeWord.word.artikel
@@ -620,7 +685,8 @@ function StoryActivity({ words, onExit }) {
               {activeWord.word.notizen}
             </Text>
           ) : null}
-        </View>
+          </View>
+        </>
       ) : null}
 
       {translation ? (
@@ -1448,6 +1514,74 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 150,
   },
+  storyLevelScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    paddingBottom: 52,
+  },
+  storyLevelTitle: {
+    marginTop: 12,
+    color: colors.textDark,
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  storyLevelIntro: {
+    maxWidth: 440,
+    marginTop: 8,
+    color: colors.textMuted,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  storyLevelOptions: {
+    width: '100%',
+    maxWidth: 520,
+    gap: 11,
+    marginTop: 26,
+  },
+  storyLevelOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 13,
+    backgroundColor: colors.cardBg,
+  },
+  storyLevelOptionPressed: {
+    opacity: 0.72,
+  },
+  storyLevelBadge: {
+    width: 45,
+    height: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 23,
+    backgroundColor: colors.misc.bg,
+  },
+  storyLevelBadgeText: {
+    color: colors.misc.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  storyLevelCopy: {
+    flex: 1,
+  },
+  storyLevelOptionTitle: {
+    color: colors.textDark,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  storyLevelDescription: {
+    marginTop: 3,
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   storyResetButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1556,25 +1690,46 @@ const makeStyles = (colors) => StyleSheet.create({
     alignSelf: 'flex-end',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 10,
     marginBottom: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 13,
-    borderWidth: 1.5,
-    borderColor: colors.misc.text,
-    borderRadius: 999,
-    backgroundColor: colors.misc.bg,
+    paddingVertical: 7,
+    paddingLeft: 4,
   },
   storyTranslateToggleActive: {
-    backgroundColor: colors.misc.text,
+    opacity: 1,
   },
   storyTranslateToggleText: {
-    color: colors.misc.text,
+    color: colors.textMuted,
     fontSize: 14,
     fontWeight: '800',
   },
   storyTranslateToggleTextActive: {
-    color: colors.cardBg,
+    color: colors.misc.text,
+  },
+  storyTranslateSwitchTrack: {
+    width: 44,
+    height: 26,
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderRadius: 13,
+    backgroundColor: colors.border,
+  },
+  storyTranslateSwitchTrackActive: {
+    backgroundColor: colors.misc.text,
+  },
+  storyTranslateSwitchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.cardBg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  storyTranslateSwitchThumbActive: {
+    alignSelf: 'flex-end',
   },
   storyTranslateHint: {
     marginTop: -2,
@@ -1656,6 +1811,10 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textMuted,
     fontSize: 15,
     lineHeight: 24,
+  },
+  storyMeaningDismissLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 40,
   },
   wordMeaningOverlay: {
     position: 'absolute',
