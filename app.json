@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "wordcontrol",
+    "name": "DLT",
     "slug": "wordcontrol",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "com.amogh.wordcontrol",
+    "scheme": "com.amogh.dlt",
     "icon": "./assets/icon_wordcontrol.png",
     "userInterfaceStyle": "dark",
     "ios": {
@@ -18,7 +18,7 @@
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/icon_wordcontrol.png"
       },
-      "package": "com.amogh.wordcontrol"
+      "package": "com.amogh.dlt"
     },
     "web": {
       "favicon": "./assets/icon_wordcontrol.png"

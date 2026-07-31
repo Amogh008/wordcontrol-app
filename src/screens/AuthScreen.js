@@ -115,7 +115,8 @@ export default function AuthScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <View style={styles.content}>
-        <Text style={styles.title}>Wordcontrol</Text>
+        <Text style={styles.title}>DLT</Text>
+        <Text style={styles.brandName}>Deutsche Learn Tool</Text>
         <Text style={styles.subtitle}>
           {mode === 'login'
             ? 'Log in to your account'
@@ -240,6 +241,15 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textDark,
     textAlign: 'center',
     marginBottom: 4,
+  },
+  brandName: {
+    color: colors.misc.text,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,

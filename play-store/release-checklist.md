@@ -1,4 +1,4 @@
-# Wordcontrol — Release checklist
+# DLT — Release checklist
 
 ## Code and services
 
@@ -14,10 +14,10 @@
 
 ## Android and Google authentication
 
-- [x] Permanent Android package: `com.amogh.wordcontrol`
+- [x] Permanent Android package: `com.amogh.dlt`
 - [x] Initial Android version code: `1`
 - [x] Target Android API: 36
-- [ ] Create/update the Android OAuth client for `com.amogh.wordcontrol`.
+- [ ] Create/update the Android OAuth client for `com.amogh.dlt`.
 - [ ] Add the upload certificate SHA-1 fingerprint:
   `86:B4:FF:BD:C3:85:49:9E:DB:F9:AD:AF:8C:81:AD:40:F6:AF:59:04`
 - [ ] Put the resulting Android client ID in the app build environment.
@@ -26,7 +26,7 @@
 ## Play Console
 
 - [ ] Complete developer identity verification.
-- [ ] Create the Wordcontrol app entry with the permanent package name.
+- [ ] Create the DLT – Deutsche Learn Tool app entry with the permanent package name.
 - [ ] Accept Play App Signing.
 - [ ] Add store description, icon, feature graphic, and phone screenshots.
 - [ ] Add support email and privacy-policy URL.

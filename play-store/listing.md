@@ -1,8 +1,8 @@
-# Wordcontrol — Google Play listing
+# DLT — Google Play listing
 
 ## App name
 
-Wordcontrol
+DLT – Deutsche Learn Tool
 
 ## Short description
 
@@ -10,13 +10,13 @@ Build German vocabulary with smart stories, practice games, notes, and translati
 
 ## Full description
 
-Learn German vocabulary in context with Wordcontrol.
+Learn German vocabulary in context with DLT (Deutsche Learn Tool).
 
 Save new German words with their article, English meaning, and personal notes. Turn your vocabulary
 into memorable practice through interactive stories, flashcards, meaning challenges, article
 practice, and Word Quest.
 
-Wordcontrol includes:
+DLT includes:
 
 - A personal German vocabulary list with der, die, and das support
 - Dictionary lookup with meanings, grammar details, examples, and pronunciation
@@ -29,7 +29,7 @@ Wordcontrol includes:
 - Account and data deletion controls
 - Light and dark themes
 
-Wordcontrol is designed for adult and older-teen German learners who want one focused place to
+DLT is designed for adult and older-teen German learners who want one focused place to
 collect, understand, and actively practise the words they encounter.
 
 Some learning tools send the text you submit to an AI service to generate the requested result.
@@ -59,5 +59,5 @@ its credentials under Play Console → App access. Explain that all primary feat
 
 ## Release notes — 1.0.0
 
-Initial release of Wordcontrol with vocabulary management, dictionary tools, stories, translation,
+Initial release of DLT with vocabulary management, dictionary tools, stories, translation,
 grammar support, pronunciation, notes, flashcards, and German-learning games.

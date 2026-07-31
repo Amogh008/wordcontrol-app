@@ -1,4 +1,4 @@
-# Wordcontrol — Data Safety working sheet
+# DLT — Data Safety working sheet
 
 Use this as a preparation aid. Confirm every answer against the final production services before
 submitting the Play Console form.
