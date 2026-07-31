@@ -38,6 +38,14 @@ export function AuthProvider({ children }) {
     setUser(await authService.loginWithGoogle(idToken));
   }, []);
 
+  const forgotPassword = useCallback(async (email) => {
+    return authService.forgotPassword(email);
+  }, []);
+
+  const resetPassword = useCallback(async (details) => {
+    return authService.resetPassword(details);
+  }, []);
+
   const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
@@ -62,6 +70,8 @@ export function AuthProvider({ children }) {
         login,
         register,
         verifyEmail,
+        forgotPassword,
+        resetPassword,
         loginWithGoogle,
         linkGoogle,
         logout,

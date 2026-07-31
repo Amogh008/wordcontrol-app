@@ -23,11 +23,12 @@ const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: '
 export default function AuthScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { login, register, verifyEmail, loginWithGoogle } = useAuth();
+  const { login, register, verifyEmail, forgotPassword, resetPassword, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
@@ -51,6 +52,66 @@ export default function AuthScreen() {
   }, [response, loginWithGoogle]);
 
   const submit = async () => {
+    if (mode === 'forgot') {
+      if (!email.trim()) {
+        setFormError('Enter your email address.');
+        return;
+      }
+      setFormError('');
+      setSubmitting(true);
+      try {
+        await forgotPassword(email.trim());
+        setVerificationEmail(email.trim().toLowerCase());
+        setVerificationCode('');
+        setPassword('');
+        setConfirmPassword('');
+        setMode('reset');
+      } catch (err) {
+        setFormError(
+          err.response?.data?.error || err.message || 'The reset code could not be sent.',
+        );
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (mode === 'reset') {
+      if (!/^\d{6}$/.test(verificationCode.trim())) {
+        setFormError('Enter the six-digit reset code.');
+        return;
+      }
+      if (password.length < 8) {
+        setFormError('Password must be at least 8 characters.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setFormError('Passwords do not match.');
+        return;
+      }
+      setFormError('');
+      setSubmitting(true);
+      try {
+        await resetPassword({
+          email: verificationEmail,
+          code: verificationCode.trim(),
+          password,
+        });
+        Alert.alert('Password updated', 'You can now log in with your new password.');
+        setPassword('');
+        setConfirmPassword('');
+        setVerificationCode('');
+        setMode('login');
+      } catch (err) {
+        setFormError(
+          err.response?.data?.error || err.message || 'Password reset failed.',
+        );
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (mode === 'verify') {
       if (!/^\d{6}$/.test(verificationCode.trim())) {
         setFormError('Enter the six-digit code from your email.');
@@ -112,6 +173,21 @@ export default function AuthScreen() {
     }
   };
 
+  const resendPasswordResetCode = async () => {
+    setFormError('');
+    setResending(true);
+    try {
+      await forgotPassword(verificationEmail);
+      Alert.alert('Code sent', `A new password reset code was sent to ${verificationEmail}.`);
+    } catch (err) {
+      setFormError(
+        err.response?.data?.error || err.message || 'The reset code could not be resent.',
+      );
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <View style={styles.content}>
@@ -122,7 +198,11 @@ export default function AuthScreen() {
             ? 'Log in to your account'
             : mode === 'register'
               ? 'Create an account'
-              : `Enter the code sent to ${verificationEmail}`}
+              : mode === 'forgot'
+                ? 'Enter your account email to receive a reset code'
+                : mode === 'reset'
+                  ? `Enter the reset code sent to ${verificationEmail}`
+                  : `Enter the code sent to ${verificationEmail}`}
         </Text>
 
         {mode === 'register' ? (
@@ -146,6 +226,37 @@ export default function AuthScreen() {
             autoComplete="one-time-code"
             maxLength={6}
           />
+        ) : mode === 'reset' ? (
+          <>
+            <TextInput
+              style={[styles.input, styles.codeInput]}
+              placeholder="000000"
+              placeholderTextColor={colors.placeholder}
+              value={verificationCode}
+              onChangeText={(value) => setVerificationCode(value.replace(/\D/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              autoComplete="one-time-code"
+              maxLength={6}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="New password (minimum 8 characters)"
+              placeholderTextColor={colors.placeholder}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm new password"
+              placeholderTextColor={colors.placeholder}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+          </>
         ) : (
           <>
             <TextInput
@@ -158,15 +269,17 @@ export default function AuthScreen() {
               autoComplete="email"
               keyboardType="email-address"
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor={colors.placeholder}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-            />
+            {mode !== 'forgot' ? (
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor={colors.placeholder}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            ) : null}
           </>
         )}
 
@@ -177,13 +290,49 @@ export default function AuthScreen() {
         ) : null}
 
         <OutlinedButton
-          title={mode === 'login' ? 'Log In' : mode === 'register' ? 'Send Code' : 'Verify Email'}
-          icon={mode === 'login' ? 'login' : mode === 'register' ? 'mail-outline' : 'checkmark-circle-outline'}
+          title={mode === 'login'
+            ? 'Log In'
+            : mode === 'register'
+              ? 'Send Code'
+              : mode === 'forgot'
+                ? 'Send Reset Code'
+                : mode === 'reset'
+                  ? 'Set New Password'
+                  : 'Verify Email'}
+          icon={mode === 'login'
+            ? 'login'
+            : mode === 'reset'
+              ? 'key-outline'
+              : mode === 'verify'
+                ? 'checkmark-circle-outline'
+                : 'mail-outline'}
           onPress={submit}
           disabled={submitting}
           loading={submitting}
           style={styles.primaryButton}
         />
+
+        {mode === 'login' ? (
+          <Pressable
+            onPress={() => {
+              setFormError('');
+              setMode('forgot');
+            }}
+          >
+            <Text style={styles.switchModeText}>Forgot password?</Text>
+          </Pressable>
+        ) : null}
+        {mode === 'reset' ? (
+          <Pressable
+            onPress={resendPasswordResetCode}
+            disabled={resending}
+            style={styles.resendButton}
+          >
+            <Text style={styles.switchModeText}>
+              {resending ? 'Sending a new code…' : 'Resend reset code'}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           onPress={() => {
@@ -211,7 +360,7 @@ export default function AuthScreen() {
           </Pressable>
         ) : null}
 
-        {isGoogleConfigured && mode !== 'verify' ? (
+        {isGoogleConfigured && (mode === 'login' || mode === 'register') ? (
           <>
             <View style={styles.divider} />
             <Pressable

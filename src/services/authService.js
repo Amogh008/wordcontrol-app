@@ -31,6 +31,16 @@ export async function login({ email, password }) {
   return data.user;
 }
 
+export async function forgotPassword(email) {
+  const { data } = await authClient.post('/forgot-password', { email });
+  return data;
+}
+
+export async function resetPassword({ email, code, password }) {
+  const { data } = await authClient.post('/reset-password', { email, code, password });
+  return data;
+}
+
 export async function loginWithGoogle(idToken) {
   const { data } = await authClient.post('/google', { idToken });
   await setToken(data.token);
