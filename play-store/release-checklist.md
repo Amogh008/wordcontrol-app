@@ -15,12 +15,12 @@
 ## Android and Google authentication
 
 - [x] Permanent Android package: `com.amogh.dlt`
-- [x] Initial Android version code: `1`
+- [x] Android version code: `2`
 - [x] Target Android API: 36
-- [ ] Create/update the Android OAuth client for `com.amogh.dlt`.
-- [ ] Add the upload certificate SHA-1 fingerprint:
-  `86:B4:FF:BD:C3:85:49:9E:DB:F9:AD:AF:8C:81:AD:40:F6:AF:59:04`
-- [ ] Put the resulting Android client ID in the app build environment.
+- [x] Create the Play-signed Android OAuth client for `com.amogh.dlt`.
+- [x] Register the Play app-signing SHA-1 fingerprint:
+  `4A:9B:94:94:5D:2B:75:62:45:92:E9:88:F3:1E:7B:01:94:9F:7F:97`
+- [x] Put the resulting Android client ID in the app build environment.
 - [x] Build and retain the signed production AAB and upload-key backup.
 
 ## Play Console
