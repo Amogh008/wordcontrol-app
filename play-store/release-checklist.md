@@ -15,7 +15,7 @@
 ## Android and Google authentication
 
 - [x] Permanent Android package: `com.amogh.dlt`
-- [x] Android version code: `2`
+- [x] Android version code: `3`
 - [x] Target Android API: 36
 - [x] Create the Play-signed Android OAuth client for `com.amogh.dlt`.
 - [x] Register the Play app-signing SHA-1 fingerprint:
