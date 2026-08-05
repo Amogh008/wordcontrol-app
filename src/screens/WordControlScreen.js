@@ -15,6 +15,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { articles, selectableArticles } from '../theme/colors';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { addWord, autofillWord, deleteWord, getWords, updateWord } from '../services/wordsService';
 import OutlinedButton from '../components/OutlinedButton';
 import ReadAloudButton from '../components/ReadAloudButton';
@@ -48,6 +49,8 @@ function AlphabetIndex({ letters, onSelect }) {
 
 export default function WordControlScreen() {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [mode, setMode] = useState('list');
   const [words, setWords] = useState([]);
@@ -81,11 +84,11 @@ export default function WordControlScreen() {
       const fetched = await getWords();
       setWords(fetched);
     } catch (err) {
-      Alert.alert('Fehler', err.message ?? 'Failed to load words.');
+      Alert.alert(isDe ? 'Fehler' : 'Error', err.message ?? 'Failed to load words.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isDe]);
 
   useEffect(() => {
     load();
@@ -186,7 +189,7 @@ export default function WordControlScreen() {
     } catch (err) {
       const msg =
         err.response?.data?.error ?? err.message ?? 'Could not autofill this word.';
-      Alert.alert('Autofill fehlgeschlagen', msg);
+      Alert.alert(isDe ? 'Autofill fehlgeschlagen' : 'Autofill failed', msg);
     } finally {
       setFilling(false);
     }
@@ -214,7 +217,7 @@ export default function WordControlScreen() {
         // Stay on the "Neues Wort" tab with a cleared form, ready for the next word.
       }
     } catch (err) {
-      Alert.alert('Fehler', err.message ?? 'Failed to save word.');
+      Alert.alert(isDe ? 'Fehler' : 'Error', err.message ?? 'Failed to save word.');
     } finally {
       setSaving(false);
     }
@@ -231,10 +234,10 @@ export default function WordControlScreen() {
   };
 
   const handleDelete = (id, onDeleted) => {
-    Alert.alert('Wort löschen?', 'This word will be removed.', [
-      { text: 'Abbrechen', style: 'cancel' },
+    Alert.alert(isDe ? 'Wort löschen?' : 'Delete word?', isDe ? 'Dieses Wort wird entfernt.' : 'This word will be removed.', [
+      { text: isDe ? 'Abbrechen' : 'Cancel', style: 'cancel' },
       {
-        text: 'Löschen',
+        text: isDe ? 'Löschen' : 'Delete',
         style: 'destructive',
         onPress: async () => {
           try {
@@ -242,7 +245,7 @@ export default function WordControlScreen() {
             await load();
             onDeleted?.();
           } catch (err) {
-            Alert.alert('Fehler', err.message ?? 'Failed to delete word.');
+            Alert.alert(isDe ? 'Fehler' : 'Error', err.message ?? 'Failed to delete word.');
           }
         },
       },
@@ -253,8 +256,8 @@ export default function WordControlScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          <Text style={styles.titleBold}>Mein </Text>
-          <Text style={styles.titleItalic}>Wörterbuch</Text>
+          <Text style={styles.titleBold}>{isDe ? 'Mein ' : 'My '}</Text>
+          <Text style={styles.titleItalic}>{isDe ? 'Wörterbuch' : 'Vocabulary'}</Text>
         </Text>
         <Text style={styles.subtitle}>
           <Text style={{ color: colors.der.text }}>der</Text>
@@ -276,7 +279,7 @@ export default function WordControlScreen() {
             numberOfLines={1}
             style={[styles.tabButtonText, mode === 'add' && styles.tabButtonTextActive]}
           >
-            {editingId ? 'Wort bearbeiten' : '+ Neues Wort'}
+            {editingId ? (isDe ? 'Wort bearbeiten' : 'Edit word') : (isDe ? '+ Neues Wort' : '+ New word')}
           </Text>
         </Pressable>
         <Pressable
@@ -290,7 +293,7 @@ export default function WordControlScreen() {
             numberOfLines={1}
             style={[styles.tabButtonText, mode === 'list' && styles.tabButtonTextActive]}
           >
-            Wörterbuch <Text style={styles.tabBadge}>{words.length}</Text>
+            {isDe ? 'Wörterbuch' : 'Vocabulary'} <Text style={styles.tabBadge}>{words.length}</Text>
           </Text>
         </Pressable>
       </View>
@@ -300,7 +303,7 @@ export default function WordControlScreen() {
           <View style={styles.formCard}>
             <View style={styles.actionRow}>
               <OutlinedButton
-                title={saving ? 'Speichern…' : editingId ? 'Änderungen speichern' : 'Wort speichern'}
+                title={saving ? (isDe ? 'Speichern…' : 'Saving…') : editingId ? (isDe ? 'Änderungen speichern' : 'Save changes') : (isDe ? 'Wort speichern' : 'Save word')}
                 icon="save"
                 tone="success"
                 onPress={handleSave}
@@ -311,13 +314,13 @@ export default function WordControlScreen() {
 
               <Pressable style={styles.clearButton} onPress={resetForm}>
                 <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
-                <Text style={styles.clearButtonText}>Clear All</Text>
+                <Text style={styles.clearButtonText}>{isDe ? 'Alles leeren' : 'Clear all'}</Text>
               </Pressable>
             </View>
 
             <View style={styles.formRow}>
               <View style={{ flex: 0.35, marginRight: 12 }}>
-                <Text style={styles.label}>ARTIKEL</Text>
+                <Text style={styles.label}>{isDe ? 'ARTIKEL' : 'ARTICLE'}</Text>
                 <View style={styles.pickerWrap}>
                   <Picker
                     selectedValue={artikel}
@@ -333,7 +336,7 @@ export default function WordControlScreen() {
                 </View>
               </View>
               <View style={{ flex: 0.65 }}>
-                <Text style={styles.label}>WORT *</Text>
+                <Text style={styles.label}>{isDe ? 'WORT *' : 'WORD *'}</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="z.B. Haus"
@@ -351,14 +354,14 @@ export default function WordControlScreen() {
             >
               <Ionicons name="sparkles" size={15} color={colors.misc.text} />
               <Text style={styles.autofillButtonText}>
-                {filling ? 'Fülle aus…' : 'Auto-fill mit KI'}
+                {filling ? (isDe ? 'Fülle aus…' : 'Filling…') : (isDe ? 'Automatisch mit KI' : 'AI autofill')}
               </Text>
             </Pressable>
 
             {wortMatches.length > 0 ? (
               <View style={styles.matchPanel}>
                 <Text style={styles.matchPanelTitle}>
-                  {wortMatches.length === 1 ? 'Schon vorhanden:' : `${wortMatches.length} ähnliche Wörter:`}
+                  {wortMatches.length === 1 ? (isDe ? 'Schon vorhanden:' : 'Already saved:') : `${wortMatches.length} ${isDe ? 'ähnliche Wörter:' : 'similar words:'}`}
                 </Text>
                 {wortMatches.map((w) => (
                   <View key={w.id ?? w._id} style={styles.matchRow}>
@@ -376,7 +379,7 @@ export default function WordControlScreen() {
               </View>
             ) : null}
 
-            <Text style={styles.label}>BEDEUTUNG / MEANING *</Text>
+            <Text style={styles.label}>{isDe ? 'BEDEUTUNG *' : 'MEANING *'}</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. house"
@@ -385,7 +388,7 @@ export default function WordControlScreen() {
               onChangeText={setBedeutung}
             />
 
-            <Text style={styles.label}>NOTIZEN / NOTES</Text>
+            <Text style={styles.label}>{isDe ? 'NOTIZEN' : 'NOTES'}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Plural, example sentence, memory trick..."
@@ -401,7 +404,7 @@ export default function WordControlScreen() {
         <View style={styles.body}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Wort suchen…  (word, meaning or notes)"
+            placeholder={isDe ? 'Wort suchen… (Wort, Bedeutung oder Notizen)' : 'Search words… (word, meaning or notes)'}
             placeholderTextColor={colors.placeholder}
             value={search}
             onChangeText={setSearch}
@@ -433,7 +436,7 @@ export default function WordControlScreen() {
                       active ? { color: '#fff' } : { color: style ? style.text : colors.textDark },
                     ]}
                   >
-                    {key} <Text style={styles.filterCount}>{counts[key] ?? 0}</Text>
+                    {key === 'Alle' && !isDe ? 'All' : key} <Text style={styles.filterCount}>{counts[key] ?? 0}</Text>
                   </Text>
                 </Pressable>
               );
@@ -441,12 +444,12 @@ export default function WordControlScreen() {
           </ScrollView>
 
           {loading ? (
-            <Text style={styles.emptyText}>Lädt…</Text>
+            <Text style={styles.emptyText}>{isDe ? 'Lädt…' : 'Loading…'}</Text>
           ) : filteredWords.length === 0 ? (
             <Text style={styles.emptyText}>
               {words.length === 0
-                ? 'Noch keine Wörter. Füge dein erstes Wort im Tab „Neues Wort" hinzu!'
-                : 'Keine Treffer.'}
+                ? (isDe ? 'Noch keine Wörter. Füge dein erstes Wort im Tab „Neues Wort“ hinzu!' : 'No words yet. Add your first one in the “New word” tab!')
+                : (isDe ? 'Keine Treffer.' : 'No matches.')}
             </Text>
           ) : (
             <View style={styles.listArea}>
@@ -548,12 +551,12 @@ export default function WordControlScreen() {
                 <Text style={styles.modalMeaning}>{detailWord.bedeutung}</Text>
                 {detailWord.notizen ? (
                   <View style={styles.modalNotesBlock}>
-                    <Text style={styles.modalNotesLabel}>NOTIZEN</Text>
+                    <Text style={styles.modalNotesLabel}>{isDe ? 'NOTIZEN' : 'NOTES'}</Text>
                     <Text style={styles.modalNotesText}>{detailWord.notizen}</Text>
                   </View>
                 ) : null}
                 <Pressable style={styles.modalCloseButton} onPress={() => setDetailWord(null)}>
-                  <Text style={styles.modalCloseButtonText}>Schließen</Text>
+                  <Text style={styles.modalCloseButtonText}>{isDe ? 'Schließen' : 'Close'}</Text>
                 </Pressable>
               </>
             ) : null}

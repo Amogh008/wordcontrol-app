@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getWords } from '../services/wordsService';
 import GamesView from '../components/GamesView';
 
@@ -9,6 +10,8 @@ const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: '
 
 export default function GamesScreen({ active }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [words, setWords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,15 +39,15 @@ export default function GamesScreen({ active }) {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          <Text style={styles.titleBold}>Meine </Text>
-          <Text style={styles.titleItalic}>Spiele</Text>
+          <Text style={styles.titleBold}>{isDe ? 'Meine ' : 'My '}</Text>
+          <Text style={styles.titleItalic}>{isDe ? 'Spiele' : 'Games'}</Text>
         </Text>
-        <Text style={styles.subtitle}>Teste dein Deutsch</Text>
+        <Text style={styles.subtitle}>{isDe ? 'Teste dein Deutsch' : 'Test your German'}</Text>
       </View>
 
       <View style={styles.body}>
         {loading && !hasLoaded.current ? (
-          <Text style={styles.loading}>Lädt…</Text>
+          <Text style={styles.loading}>{isDe ? 'Lädt…' : 'Loading…'}</Text>
         ) : (
           <GamesView words={words} />
         )}

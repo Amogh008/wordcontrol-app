@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getDictionaryEntry, searchDictionary } from '../services/dictionaryService';
 import ReadAloudButton from '../components/ReadAloudButton';
 
@@ -25,6 +26,8 @@ function Section({ title, children, styles }) {
 
 export default function DictionaryScreen() {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -103,7 +106,7 @@ export default function DictionaryScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Dictionary</Text>
-        <Text style={styles.subtitle}>1,6 Millionen deutsche Wortformen</Text>
+        <Text style={styles.subtitle}>{isDe ? '1,6 Millionen deutsche Wortformen' : '1.6 million German word forms'}</Text>
       </View>
 
       <View style={styles.searchWrap}>
@@ -112,7 +115,7 @@ export default function DictionaryScreen() {
           style={styles.searchInput}
           value={query}
           onChangeText={setQuery}
-          placeholder="Deutsches Wort suchen…"
+          placeholder={isDe ? 'Deutsches Wort suchen…' : 'Search for a German word…'}
           placeholderTextColor={colors.placeholder}
           autoCapitalize="none"
           autoCorrect={false}
@@ -139,7 +142,7 @@ export default function DictionaryScreen() {
       {loadingEntry ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.misc.text} />
-          <Text style={styles.loadingText}>Wörterbucheintrag wird erstellt…</Text>
+          <Text style={styles.loadingText}>{isDe ? 'Wörterbucheintrag wird erstellt…' : 'Creating dictionary entry…'}</Text>
         </View>
       ) : error ? (
         <View style={styles.messageCard}>
@@ -160,11 +163,11 @@ export default function DictionaryScreen() {
             </View>
             <Text style={styles.partOfSpeech}>{entry.partOfSpeech}</Text>
             {entry.word !== entry.lemma ? (
-              <Text style={styles.queriedForm}>Gesuchte Form: {entry.word}</Text>
+              <Text style={styles.queriedForm}>{isDe ? 'Gesuchte Form' : 'Searched form'}: {entry.word}</Text>
             ) : null}
           </View>
 
-          <Section title="BEDEUTUNGEN" styles={styles}>
+          <Section title={isDe ? 'BEDEUTUNGEN' : 'MEANINGS'} styles={styles}>
             {entry.meanings.map((meaning, index) => (
               <View key={`${meaning.english}-${index}`} style={styles.meaningRow}>
                 <Text style={styles.meaningNumber}>{index + 1}</Text>
@@ -177,10 +180,10 @@ export default function DictionaryScreen() {
           </Section>
 
           {isNoun && plural ? (
-            <Section title="PLURAL" styles={styles}>
+            <Section title={isDe ? 'PLURAL' : 'PLURAL'} styles={styles}>
               <View style={styles.formsGrid}>
                 <View style={styles.formCard}>
-                  <Text style={styles.formLabel}>Pluralform</Text>
+                  <Text style={styles.formLabel}>{isDe ? 'Pluralform' : 'Plural form'}</Text>
                   <Text style={styles.formValue}>{plural}</Text>
                 </View>
               </View>
@@ -190,7 +193,7 @@ export default function DictionaryScreen() {
           {!isNoun ? grammarSections.map((grammarSection, sectionIndex) => (
             <Section
               key={`${grammarSection.title}-${sectionIndex}`}
-              title={(grammarSection.title || 'GRAMMATISCHE FORMEN').toLocaleUpperCase('de-DE')}
+              title={(grammarSection.title || (isDe ? 'GRAMMATISCHE FORMEN' : 'GRAMMATICAL FORMS')).toLocaleUpperCase(isDe ? 'de-DE' : 'en-US')}
               styles={styles}
             >
               <View style={styles.grammarTable}>
@@ -210,7 +213,7 @@ export default function DictionaryScreen() {
             </Section>
           )) : null}
 
-          <Section title="BEISPIELSÄTZE" styles={styles}>
+          <Section title={isDe ? 'BEISPIELSÄTZE' : 'EXAMPLE SENTENCES'} styles={styles}>
             {entry.examples?.map((example, index) => (
               <View key={`${example.german}-${index}`} style={styles.exampleCard}>
                 <View style={styles.exampleGermanRow}>
@@ -223,7 +226,7 @@ export default function DictionaryScreen() {
           </Section>
 
           {entry.usageNotes?.length ? (
-            <Section title="HINWEISE" styles={styles}>
+            <Section title={isDe ? 'HINWEISE' : 'NOTES'} styles={styles}>
               {entry.usageNotes.map((note) => (
                 <Text key={note} style={styles.note}>• {note}</Text>
               ))}
@@ -231,7 +234,7 @@ export default function DictionaryScreen() {
           ) : null}
 
           {entry.relatedWords?.length ? (
-            <Section title="VERWANDTE WÖRTER" styles={styles}>
+            <Section title={isDe ? 'VERWANDTE WÖRTER' : 'RELATED WORDS'} styles={styles}>
               <View style={styles.relatedWrap}>
                 {entry.relatedWords.map((word) => (
                   <Pressable key={word} style={styles.relatedChip} onPress={() => selectWord(word)}>
@@ -241,13 +244,13 @@ export default function DictionaryScreen() {
               </View>
             </Section>
           ) : null}
-          <Text style={styles.aiNotice}>Linguistische Details wurden mit KI erstellt.</Text>
+          <Text style={styles.aiNotice}>{isDe ? 'Linguistische Details wurden mit KI erstellt.' : 'Linguistic details were generated with AI.'}</Text>
         </ScrollView>
       ) : (
         <View style={styles.center}>
           <Ionicons name="library-outline" size={42} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>Ein deutsches Wort nachschlagen</Text>
-          <Text style={styles.emptyText}>Gib mindestens zwei Buchstaben ein und wähle ein Wort aus.</Text>
+          <Text style={styles.emptyTitle}>{isDe ? 'Ein deutsches Wort nachschlagen' : 'Look up a German word'}</Text>
+          <Text style={styles.emptyText}>{isDe ? 'Gib mindestens zwei Buchstaben ein und wähle ein Wort aus.' : 'Enter at least two letters and select a word.'}</Text>
         </View>
       )}
     </SafeAreaView>

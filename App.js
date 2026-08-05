@@ -13,6 +13,7 @@ import AuthScreen from './src/screens/AuthScreen';
 import BottomBar from './src/components/BottomBar';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { LanguageProvider } from './src/context/LanguageContext';
 
 function TabPanel({ active, children }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -104,9 +105,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AuthProvider>
-          <Root />
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <Root />
+          </AuthProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

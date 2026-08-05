@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { isGoogleConfigured, useGoogleIdTokenRequest } from '../services/googleAuth';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
@@ -26,6 +27,7 @@ function initialsFor(user) {
 export default function SettingsScreen() {
   const { user, logout, deleteAccount, linkGoogle } = useAuth();
   const { colors, scheme, toggleTheme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [deleting, setDeleting] = useState(false);
   const [linkingGoogle, setLinkingGoogle] = useState(false);
@@ -35,24 +37,24 @@ export default function SettingsScreen() {
     if (googleResponse?.type !== 'success' || !googleResponse.params?.id_token) return;
     setLinkingGoogle(true);
     linkGoogle(googleResponse.params.id_token)
-      .then(() => Alert.alert('Google linked', 'You can now sign in using Google.'))
+      .then(() => Alert.alert(t('googleLinked'), t('googleLinkedMessage')))
       .catch((err) => {
-        Alert.alert('Could not link Google', err.response?.data?.error || err.message);
+        Alert.alert(t('googleLinkFailed'), err.response?.data?.error || err.message);
       })
       .finally(() => setLinkingGoogle(false));
-  }, [googleResponse, linkGoogle]);
+  }, [googleResponse, linkGoogle, t]);
 
   const confirmLogout = () => {
     if (Platform.OS === 'web') {
       // react-native-web's Alert.alert is a no-op; window.confirm is the web equivalent.
-      if (window.confirm('Are you sure you want to log out?')) {
+      if (window.confirm(t('logoutQuestion'))) {
         logout();
       }
       return;
     }
-    Alert.alert('Log out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: logout },
+    Alert.alert(t('logout'), t('logoutQuestion'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('logout'), style: 'destructive', onPress: logout },
     ]);
   };
 
@@ -62,23 +64,22 @@ export default function SettingsScreen() {
       await deleteAccount();
     } catch (err) {
       Alert.alert(
-        'Account could not be deleted',
-        err.response?.data?.error ?? err.message ?? 'Please try again.',
+        t('accountDeleteFailed'),
+        err.response?.data?.error ?? err.message ?? t('tryAgain'),
       );
       setDeleting(false);
     }
   };
 
   const confirmAccountDeletion = () => {
-    const message =
-      'This permanently deletes your account, saved vocabulary, and notes. This cannot be undone.';
+    const message = t('deleteMessage');
     if (Platform.OS === 'web') {
       if (window.confirm(message)) performAccountDeletion();
       return;
     }
-    Alert.alert('Delete account?', message, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete permanently', style: 'destructive', onPress: performAccountDeletion },
+    Alert.alert(t('deleteQuestion'), message, [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('deletePermanently'), style: 'destructive', onPress: performAccountDeletion },
     ]);
   };
 
@@ -86,8 +87,8 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          <Text style={styles.titleBold}>Meine </Text>
-          <Text style={styles.titleItalic}>Einstellungen</Text>
+          <Text style={styles.titleBold}>{t('my')} </Text>
+          <Text style={styles.titleItalic}>{t('settings')}</Text>
         </Text>
       </View>
 
@@ -96,11 +97,11 @@ export default function SettingsScreen() {
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initialsFor(user)}</Text>
           </View>
-          <Text style={styles.name}>{user?.name || 'No name set'}</Text>
-          <Text style={styles.email}>{user?.email || 'Signed in with Google'}</Text>
+          <Text style={styles.name}>{user?.name || t('noName')}</Text>
+          <Text style={styles.email}>{user?.email || t('signedInGoogle')}</Text>
         </View>
 
-        <Text style={styles.sectionLabel}>KONTO</Text>
+        <Text style={styles.sectionLabel}>{t('account')}</Text>
         <View style={styles.optionsCard}>
           <View style={styles.optionRow}>
             <Ionicons name="mail-outline" size={20} color={colors.textMuted} />
@@ -113,8 +114,8 @@ export default function SettingsScreen() {
           <View style={styles.optionRow}>
             <Ionicons name="logo-google" size={20} color={colors.textMuted} />
             <View style={styles.optionTextWrap}>
-              <Text style={styles.optionLabel}>Google account</Text>
-              <Text style={styles.optionValue}>{user?.googleId ? 'Linked' : 'Not linked'}</Text>
+              <Text style={styles.optionLabel}>{t('googleAccount')}</Text>
+              <Text style={styles.optionValue}>{user?.googleId ? t('linked') : t('notLinked')}</Text>
             </View>
             {!user?.googleId && isGoogleConfigured ? (
               <Pressable
@@ -125,20 +126,45 @@ export default function SettingsScreen() {
                 {linkingGoogle ? (
                   <ActivityIndicator size="small" color={colors.misc.text} />
                 ) : (
-                  <Text style={styles.linkButtonText}>Link Google</Text>
+                  <Text style={styles.linkButtonText}>{t('linkGoogle')}</Text>
                 )}
               </Pressable>
             ) : null}
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>DARSTELLUNG</Text>
+        <Text style={styles.sectionLabel}>{t('appearance')}</Text>
         <View style={styles.optionsCard}>
+          <View style={styles.optionRow}>
+            <Ionicons name="language-outline" size={20} color={colors.textMuted} />
+            <View style={styles.optionTextWrap}>
+              <Text style={styles.optionLabel}>{t('language')}</Text>
+              <View style={styles.languageButtons}>
+                <Pressable
+                  style={[styles.languageButton, language === 'en' && styles.languageButtonActive]}
+                  onPress={() => setLanguage('en')}
+                >
+                  <Text style={[styles.languageButtonText, language === 'en' && styles.languageButtonTextActive]}>
+                    English
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.languageButton, language === 'de' && styles.languageButtonActive]}
+                  onPress={() => setLanguage('de')}
+                >
+                  <Text style={[styles.languageButtonText, language === 'de' && styles.languageButtonTextActive]}>
+                    Deutsch
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+          <View style={styles.divider} />
           <View style={styles.optionRow}>
             <Ionicons name={scheme === 'dark' ? 'moon' : 'moon-outline'} size={20} color={colors.textMuted} />
             <View style={styles.optionTextWrap}>
-              <Text style={styles.optionLabel}>Dark mode</Text>
-              <Text style={styles.optionValue}>{scheme === 'dark' ? 'On' : 'Off'}</Text>
+              <Text style={styles.optionLabel}>{t('darkMode')}</Text>
+              <Text style={styles.optionValue}>{scheme === 'dark' ? t('on') : t('off')}</Text>
             </View>
             <Switch
               value={scheme === 'dark'}
@@ -151,7 +177,7 @@ export default function SettingsScreen() {
 
         <Pressable style={styles.logoutButton} onPress={confirmLogout}>
           <Ionicons name="log-out-outline" size={20} color="#c0392b" />
-          <Text style={styles.logoutText}>Log out</Text>
+          <Text style={styles.logoutText}>{t('logout')}</Text>
         </Pressable>
         <Pressable
           style={[styles.deleteButton, deleting && styles.disabledButton]}
@@ -164,11 +190,11 @@ export default function SettingsScreen() {
             <Ionicons name="trash-outline" size={20} color="#fff" />
           )}
           <Text style={styles.deleteText}>
-            {deleting ? 'Deleting account…' : 'Delete account'}
+            {deleting ? t('deletingAccount') : t('deleteAccount')}
           </Text>
         </Pressable>
         <Text style={styles.deleteHelp}>
-          Permanently removes your account, vocabulary, and notes.
+          {t('deleteHelp')}
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -233,6 +259,17 @@ const makeStyles = (colors) => StyleSheet.create({
   optionTextWrap: { flex: 1 },
   optionLabel: { fontSize: 13, color: colors.textMuted },
   optionValue: { fontSize: 15, color: colors.textDark, fontWeight: '600', marginTop: 2 },
+  languageButtons: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  languageButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  languageButtonActive: { backgroundColor: colors.activePill, borderColor: colors.activePill },
+  languageButtonText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
+  languageButtonTextActive: { color: '#fff' },
   linkButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,

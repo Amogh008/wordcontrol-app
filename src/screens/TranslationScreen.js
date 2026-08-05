@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { translateText } from '../services/wordsService';
 import OutlinedButton from '../components/OutlinedButton';
 
@@ -21,6 +22,9 @@ const LABEL = { de: 'Deutsch', en: 'Englisch' };
 
 export default function TranslationScreen() {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
+  const labels = isDe ? LABEL : { de: 'German', en: 'English' };
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [from, setFrom] = useState('de');
   const to = from === 'de' ? 'en' : 'de';
@@ -41,8 +45,8 @@ export default function TranslationScreen() {
       const { translation: result } = await translateText({ text: input.trim(), from, to });
       setTranslation(result);
     } catch (err) {
-      const msg = err.response?.data?.error ?? err.message ?? 'Übersetzung fehlgeschlagen.';
-      Alert.alert('Fehler', msg);
+      const msg = err.response?.data?.error ?? err.message ?? (isDe ? 'Übersetzung fehlgeschlagen.' : 'Translation failed.');
+      Alert.alert(isDe ? 'Fehler' : 'Error', msg);
     } finally {
       setLoading(false);
     }
@@ -60,8 +64,8 @@ export default function TranslationScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          <Text style={styles.titleBold}>Mein </Text>
-          <Text style={styles.titleItalic}>Übersetzer</Text>
+          <Text style={styles.titleBold}>{isDe ? 'Mein ' : 'My '}</Text>
+          <Text style={styles.titleItalic}>{isDe ? 'Übersetzer' : 'Translator'}</Text>
         </Text>
         <Text style={styles.subtitle}>Deutsch ⇄ Englisch</Text>
       </View>
@@ -69,20 +73,20 @@ export default function TranslationScreen() {
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <View style={styles.langRow}>
           <View style={styles.langChip}>
-            <Text style={styles.langChipText}>{LABEL[from]}</Text>
+            <Text style={styles.langChipText}>{labels[from]}</Text>
           </View>
           <Pressable style={styles.swapButton} onPress={swap} hitSlop={8}>
             <Ionicons name="swap-horizontal" size={22} color={colors.textDark} />
           </Pressable>
           <View style={styles.langChip}>
-            <Text style={styles.langChipText}>{LABEL[to]}</Text>
+            <Text style={styles.langChipText}>{labels[to]}</Text>
           </View>
         </View>
 
-        <Text style={styles.label}>{LABEL[from].toUpperCase()}</Text>
+        <Text style={styles.label}>{labels[from].toUpperCase()}</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
-          placeholder={from === 'de' ? 'Text auf Deutsch eingeben…' : 'Enter text in English…'}
+          placeholder={from === 'de' ? (isDe ? 'Text auf Deutsch eingeben…' : 'Enter German text…') : (isDe ? 'Text auf Englisch eingeben…' : 'Enter English text…')}
           placeholderTextColor={colors.placeholder}
           value={input}
           onChangeText={setInput}
@@ -91,7 +95,7 @@ export default function TranslationScreen() {
 
         <View style={styles.actionRow}>
           <OutlinedButton
-            title={loading ? 'KI übersetzt…' : 'Übersetzen mit KI'}
+            title={loading ? (isDe ? 'KI übersetzt…' : 'AI is translating…') : (isDe ? 'Mit KI übersetzen' : 'Translate with AI')}
             icon="translate"
             tone="ai"
             onPress={handleTranslate}
@@ -102,16 +106,16 @@ export default function TranslationScreen() {
 
           <Pressable style={styles.clearButton} onPress={reset}>
             <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
-            <Text style={styles.clearButtonText}>Clear All</Text>
+            <Text style={styles.clearButtonText}>{isDe ? 'Alles löschen' : 'Clear all'}</Text>
           </Pressable>
         </View>
 
-        <Text style={styles.label}>{LABEL[to].toUpperCase()}</Text>
+        <Text style={styles.label}>{labels[to].toUpperCase()}</Text>
         <View style={styles.output}>
           {translation ? (
             <Text style={styles.outputText}>{translation}</Text>
           ) : (
-            <Text style={styles.outputPlaceholder}>Die Übersetzung erscheint hier.</Text>
+            <Text style={styles.outputPlaceholder}>{isDe ? 'Die Übersetzung erscheint hier.' : 'The translation will appear here.'}</Text>
           )}
         </View>
       </ScrollView>

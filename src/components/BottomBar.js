@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 function NeonLine({ styles }) {
   return (
@@ -47,6 +48,7 @@ export default function BottomBar({ tab, onChange }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const compact = width <= 480;
   const iconSize = compact ? 17 : 22;
   const styles = useMemo(() => makeStyles(colors, compact), [colors, compact]);
@@ -65,7 +67,7 @@ export default function BottomBar({ tab, onChange }) {
       <TabItem
         icon="book"
         iconSize={iconSize}
-        label="Wörterbuch"
+        label={t('words')}
         active={tab === 'words'}
         onPress={() => onChange('words')}
         colors={colors}
@@ -74,7 +76,7 @@ export default function BottomBar({ tab, onChange }) {
       <TabItem
         icon="language"
         iconSize={iconSize}
-        label="Übersetzer"
+        label={t('translate')}
         active={tab === 'translate'}
         onPress={() => onChange('translate')}
         colors={colors}
@@ -83,7 +85,7 @@ export default function BottomBar({ tab, onChange }) {
       <TabItem
         icon="library"
         iconSize={iconSize}
-        label="Dictionary"
+        label={t('dictionary')}
         active={tab === 'dictionary'}
         onPress={() => onChange('dictionary')}
         colors={colors}
@@ -92,7 +94,7 @@ export default function BottomBar({ tab, onChange }) {
       <TabItem
         icon="school"
         iconSize={iconSize}
-        label="Grammatik"
+        label={t('grammar')}
         active={tab === 'grammar'}
         onPress={() => onChange('grammar')}
         colors={colors}
@@ -101,7 +103,7 @@ export default function BottomBar({ tab, onChange }) {
       <TabItem
         icon="document-text"
         iconSize={iconSize}
-        label="Notizen"
+        label={t('notes')}
         active={tab === 'notes'}
         onPress={() => onChange('notes')}
         colors={colors}
@@ -110,7 +112,7 @@ export default function BottomBar({ tab, onChange }) {
       <TabItem
         icon="game-controller"
         iconSize={iconSize}
-        label="Spiele"
+        label={t('games')}
         active={tab === 'games'}
         onPress={() => onChange('games')}
         colors={colors}
@@ -119,7 +121,7 @@ export default function BottomBar({ tab, onChange }) {
       <TabItem
         icon="settings"
         iconSize={iconSize}
-        label="Einstellungen"
+        label={t('settings')}
         active={tab === 'settings'}
         onPress={() => onChange('settings')}
         colors={colors}

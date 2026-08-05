@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { selectableArticles } from '../theme/colors';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { streamStory, translateText } from '../services/wordsService';
 import ReadAloudButton from './ReadAloudButton';
 
@@ -38,15 +39,17 @@ function isNoun(w) {
 
 function Scoreboard({ score, answered, onExit }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.scoreRow}>
       <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
         <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-        <Text style={styles.exitText}>Spiele</Text>
+        <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
       </Pressable>
       <Text style={styles.scoreText}>
-        Richtig: {score} / {answered}
+        {isDe ? 'Richtig' : 'Correct'}: {score} / {answered}
       </Text>
     </View>
   );
@@ -54,12 +57,13 @@ function Scoreboard({ score, answered, onExit }) {
 
 function EmptyState({ message, onExit }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyText}>{message}</Text>
       <Pressable onPress={onExit} style={styles.emptyButton}>
-        <Text style={styles.emptyButtonText}>Zurück zu Spiele</Text>
+        <Text style={styles.emptyButtonText}>{language === 'de' ? 'Zurück zu Spiele' : 'Back to games'}</Text>
       </Pressable>
     </View>
   );
@@ -67,6 +71,8 @@ function EmptyState({ message, onExit }) {
 
 function Flashcards({ words, onExit }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const pool = useMemo(
     () => words.filter((word) => word.wort && word.bedeutung),
@@ -79,7 +85,7 @@ function Flashcards({ words, onExit }) {
   if (pool.length === 0) {
     return (
       <EmptyState
-        message="Du brauchst mindestens ein gespeichertes Wort mit Bedeutung für die Lernkarten."
+        message={isDe ? 'Du brauchst mindestens ein gespeichertes Wort mit Bedeutung für die Lernkarten.' : 'Save at least one word with a meaning to use flashcards.'}
         onExit={onExit}
       />
     );
@@ -105,13 +111,13 @@ function Flashcards({ words, onExit }) {
       <View style={styles.scoreRow}>
         <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
           <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-          <Text style={styles.exitText}>Spiele</Text>
+          <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
         </Pressable>
-        <Text style={styles.scoreText}>{pool.length} Lernkarten</Text>
+        <Text style={styles.scoreText}>{pool.length} {isDe ? 'Lernkarten' : 'flashcards'}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.flashcardBody}>
-        <Text style={styles.questionLabel}>Zufällige Lernkarte</Text>
+        <Text style={styles.questionLabel}>{isDe ? 'Zufällige Lernkarte' : 'Random flashcard'}</Text>
         <View style={[styles.flashcard, { borderColor: articleColors.text }]}>
           <View style={[styles.flashcardBadge, { backgroundColor: articleColors.bg }]}>
             <Text style={[styles.flashcardBadgeText, { color: articleColors.text }]}>
@@ -125,12 +131,12 @@ function Flashcards({ words, onExit }) {
 
           <View style={styles.flashcardDivider} />
 
-          <Text style={styles.flashcardLabel}>BEDEUTUNG</Text>
+          <Text style={styles.flashcardLabel}>{isDe ? 'BEDEUTUNG' : 'MEANING'}</Text>
           <Text style={styles.flashcardMeaning}>{card.bedeutung}</Text>
 
           {card.notizen ? (
             <>
-              <Text style={styles.flashcardLabel}>NOTIZEN</Text>
+              <Text style={styles.flashcardLabel}>{isDe ? 'NOTIZEN' : 'NOTES'}</Text>
               <Text style={styles.flashcardNotes}>{card.notizen}</Text>
             </>
           ) : null}
@@ -138,7 +144,7 @@ function Flashcards({ words, onExit }) {
 
         <Pressable style={styles.flashcardNextButton} onPress={drawNext}>
           <Ionicons name="shuffle" size={19} color={colors.misc.text} />
-          <Text style={styles.flashcardNextText}>Nächste zufällige Karte</Text>
+          <Text style={styles.flashcardNextText}>{isDe ? 'Nächste zufällige Karte' : 'Next random card'}</Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -220,6 +226,8 @@ function TranslatableParagraph({ paragraph, words, onTranslate }) {
 
 function StoryActivity({ words, onExit }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const vocabulary = useMemo(
     () => words.filter((word) => word.wort && word.bedeutung),
@@ -281,7 +289,7 @@ function StoryActivity({ words, onExit }) {
         current.filter((word) => !completedIds.has(String(word.id ?? word._id))),
       );
     } catch (err) {
-      setError(err.message ?? 'Die Geschichte konnte nicht erstellt werden.');
+      setError(err.message ?? (isDe ? 'Die Geschichte konnte nicht erstellt werden.' : 'The story could not be created.'));
     } finally {
       setLoading(false);
     }
@@ -306,7 +314,7 @@ function StoryActivity({ words, onExit }) {
   if (vocabulary.length === 0) {
     return (
       <EmptyState
-        message="Speichere mindestens ein Wort mit Bedeutung, um eine Geschichte zu erstellen."
+        message={isDe ? 'Speichere mindestens ein Wort mit Bedeutung, um eine Geschichte zu erstellen.' : 'Save at least one word with a meaning to create a story.'}
         onExit={onExit}
       />
     );
@@ -318,14 +326,14 @@ function StoryActivity({ words, onExit }) {
         <View style={styles.scoreRow}>
           <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
             <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-            <Text style={styles.exitText}>Spiele</Text>
+            <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
           </Pressable>
         </View>
         <View style={styles.storyLevelScreen}>
           <Ionicons name="book-outline" size={34} color={colors.misc.text} />
-          <Text style={styles.storyLevelTitle}>Wähle dein Sprachniveau</Text>
+          <Text style={styles.storyLevelTitle}>{isDe ? 'Wähle dein Sprachniveau' : 'Choose your language level'}</Text>
           <Text style={styles.storyLevelIntro}>
-            Die Geschichte wird passend zu deinem aktuellen Deutsch-Niveau geschrieben.
+            {isDe ? 'Die Geschichte wird passend zu deinem aktuellen Deutsch-Niveau geschrieben.' : 'The story will match your current German level.'}
           </Text>
           <View style={styles.storyLevelOptions}>
             {STORY_LEVELS.map((option) => (
@@ -470,11 +478,11 @@ function StoryActivity({ words, onExit }) {
       <View style={styles.scoreRow}>
         <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
           <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-          <Text style={styles.exitText}>Spiele</Text>
+          <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
         </Pressable>
         <Pressable style={styles.storyResetButton} onPress={resetSession} disabled={loading}>
           <Ionicons name="refresh" size={16} color={colors.misc.text} />
-          <Text style={styles.storyResetText}>Sitzung zurücksetzen</Text>
+          <Text style={styles.storyResetText}>{isDe ? 'Sitzung zurücksetzen' : 'Reset session'}</Text>
         </Pressable>
       </View>
 
@@ -496,7 +504,7 @@ function StoryActivity({ words, onExit }) {
                 translationMode && styles.storyTranslateToggleTextActive,
               ]}
             >
-              Satz übersetzen
+              {isDe ? 'Satz übersetzen' : 'Translate sentence'}
             </Text>
             <View
               style={[
@@ -514,7 +522,7 @@ function StoryActivity({ words, onExit }) {
           </Pressable>
           {translationMode ? (
             <Text style={styles.storyTranslateHint}>
-              Tippe auf einen Satz oder markiere einen beliebigen Textabschnitt.
+              {isDe ? 'Tippe auf einen Satz oder markiere einen beliebigen Textabschnitt.' : 'Tap a sentence or select any section of text.'}
             </Text>
           ) : null}
         </View>
@@ -728,6 +736,8 @@ function StoryActivity({ words, onExit }) {
 
 function MeaningGame({ words, onExit }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const pool = useMemo(() => words.filter((w) => w.wort && w.bedeutung), [words]);
   const [round, setRound] = useState(0);
@@ -753,7 +763,7 @@ function MeaningGame({ words, onExit }) {
   if (!question) {
     return (
       <EmptyState
-        message="Du brauchst mindestens 2 Wörter mit Bedeutung, um dieses Spiel zu spielen."
+        message={isDe ? 'Du brauchst mindestens 2 Wörter mit Bedeutung, um dieses Spiel zu spielen.' : 'Save at least two words with meanings to play this game.'}
         onExit={onExit}
       />
     );
@@ -779,7 +789,7 @@ function MeaningGame({ words, onExit }) {
     <View style={styles.gameArea}>
       <Scoreboard score={score} answered={answered} onExit={onExit} />
       <ScrollView contentContainerStyle={styles.gameBody} keyboardShouldPersistTaps="handled">
-        <Text style={styles.questionLabel}>Was bedeutet …</Text>
+        <Text style={styles.questionLabel}>{isDe ? 'Was bedeutet …' : 'What does this mean?'}</Text>
         <View style={styles.promptCard}>
           <Text style={styles.promptWord}>{prompt}</Text>
         </View>
@@ -820,7 +830,7 @@ function MeaningGame({ words, onExit }) {
 
         {selected ? (
           <Pressable style={styles.nextButton} onPress={next}>
-            <Text style={styles.nextButtonText}>Weiter</Text>
+            <Text style={styles.nextButtonText}>{isDe ? 'Weiter' : 'Next'}</Text>
           </Pressable>
         ) : null}
       </ScrollView>
@@ -830,6 +840,8 @@ function MeaningGame({ words, onExit }) {
 
 function ArtikelGame({ words, onExit }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const pool = useMemo(() => words.filter(isNoun), [words]);
   const [round, setRound] = useState(0);
@@ -846,7 +858,7 @@ function ArtikelGame({ words, onExit }) {
   if (!question) {
     return (
       <EmptyState
-        message="Du brauchst mindestens ein Substantiv mit Artikel (der/die/das), um dieses Spiel zu spielen."
+        message={isDe ? 'Du brauchst mindestens ein Substantiv mit Artikel (der/die/das), um dieses Spiel zu spielen.' : 'Save at least one noun with an article (der/die/das) to play.'}
         onExit={onExit}
       />
     );
@@ -868,7 +880,7 @@ function ArtikelGame({ words, onExit }) {
     <View style={styles.gameArea}>
       <Scoreboard score={score} answered={answered} onExit={onExit} />
       <ScrollView contentContainerStyle={styles.gameBody}>
-        <Text style={styles.questionLabel}>Welcher Artikel?</Text>
+        <Text style={styles.questionLabel}>{isDe ? 'Welcher Artikel?' : 'Which article?'}</Text>
         <View style={styles.promptCard}>
           <Text style={styles.promptWord}>{question.wort}</Text>
           {question.bedeutung ? (
@@ -911,11 +923,11 @@ function ArtikelGame({ words, onExit }) {
           <>
             <Text style={[styles.feedbackText, { color: selected === question.artikel ? GOOD.text : BAD.text }]}>
               {selected === question.artikel
-                ? 'Richtig!'
-                : `Falsch — es ist "${question.artikel} ${question.wort}".`}
+                ? (isDe ? 'Richtig!' : 'Correct!')
+                : (isDe ? `Falsch — es ist "${question.artikel} ${question.wort}".` : `Incorrect — it is “${question.artikel} ${question.wort}”.`)}
             </Text>
             <Pressable style={styles.nextButton} onPress={next}>
-              <Text style={styles.nextButtonText}>Weiter</Text>
+              <Text style={styles.nextButtonText}>{isDe ? 'Weiter' : 'Next'}</Text>
             </Pressable>
           </>
         ) : null}
@@ -934,6 +946,8 @@ function normalizeAnswer(value) {
 
 function WordQuest({ words, onExit }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const vocabulary = useMemo(
     () => words.filter((word) => word.wort && word.bedeutung),
@@ -956,7 +970,7 @@ function WordQuest({ words, onExit }) {
   if (!current && completed === 0) {
     return (
       <EmptyState
-        message="Du brauchst mindestens ein gespeichertes Wort mit Bedeutung für Word Quest."
+        message={isDe ? 'Du brauchst mindestens ein gespeichertes Wort mit Bedeutung für Word Quest.' : 'Save at least one word with a meaning for Word Quest.'}
         onExit={onExit}
       />
     );
@@ -1003,7 +1017,7 @@ function WordQuest({ words, onExit }) {
       <View style={styles.scoreRow}>
         <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
           <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-          <Text style={styles.exitText}>Spiele</Text>
+          <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
         </Pressable>
         <View style={styles.questStats}>
           <Text style={styles.questStat}>🔥 {streak}</Text>
@@ -1015,9 +1029,9 @@ function WordQuest({ words, onExit }) {
         contentContainerStyle={styles.gameBody}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.questionLabel}>Runde {completed + mistakes + 1} · Endlosmodus</Text>
+        <Text style={styles.questionLabel}>{isDe ? 'Runde' : 'Round'} {completed + mistakes + 1} · {isDe ? 'Endlosmodus' : 'Endless mode'}</Text>
         <View style={styles.questPromptCard}>
-          <Text style={styles.questPromptLabel}>Wie heißt dieses Wort auf Deutsch?</Text>
+          <Text style={styles.questPromptLabel}>{isDe ? 'Wie heißt dieses Wort auf Deutsch?' : 'What is this word in German?'}</Text>
           <Text style={styles.questMeaning}>{current.bedeutung}</Text>
           {hint ? (
             <Text style={styles.questHint}>
@@ -1035,9 +1049,9 @@ function WordQuest({ words, onExit }) {
           editable={!result}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder="Deine Antwort …"
+          placeholder={isDe ? 'Deine Antwort …' : 'Your answer…'}
           placeholderTextColor={colors.textMuted}
-          accessibilityLabel="Deine Antwort"
+          accessibilityLabel={isDe ? 'Deine Antwort' : 'Your answer'}
           style={[
             styles.questInput,
             result === 'correct' && styles.questInputCorrect,
@@ -1082,7 +1096,7 @@ function WordQuest({ words, onExit }) {
           onPress={result ? nextWord : checkAnswer}
           disabled={!answer.trim() && !result}
         >
-          <Text style={styles.nextButtonText}>{result ? 'Weiter' : 'Antwort prüfen'}</Text>
+          <Text style={styles.nextButtonText}>{result ? (isDe ? 'Weiter' : 'Next') : (isDe ? 'Antwort prüfen' : 'Check answer')}</Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -1091,6 +1105,8 @@ function WordQuest({ words, onExit }) {
 
 export default function GamesView({ words }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [game, setGame] = useState(null);
 
@@ -1109,10 +1125,10 @@ export default function GamesView({ words }) {
         <View style={styles.menuTextWrap}>
           <View style={styles.questTitleRow}>
             <Text style={styles.menuTitle}>Word Quest</Text>
-            <Text style={styles.newBadge}>NEU</Text>
+            <Text style={styles.newBadge}>{isDe ? 'NEU' : 'NEW'}</Text>
           </View>
           <Text style={styles.menuSubtitle}>
-            Erinnere dich aktiv, sammle XP und wiederhole schwierige Wörter.
+            {isDe ? 'Erinnere dich aktiv, sammle XP und wiederhole schwierige Wörter.' : 'Recall words, earn XP and revisit difficult vocabulary.'}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
@@ -1123,8 +1139,8 @@ export default function GamesView({ words }) {
           <Ionicons name="bulb" size={26} color={colors.das.text} />
         </View>
         <View style={styles.menuTextWrap}>
-          <Text style={styles.menuTitle}>Bedeutung raten</Text>
-          <Text style={styles.menuSubtitle}>Wähle die richtige Bedeutung des Wortes.</Text>
+          <Text style={styles.menuTitle}>{isDe ? 'Bedeutung raten' : 'Guess the meaning'}</Text>
+          <Text style={styles.menuSubtitle}>{isDe ? 'Wähle die richtige Bedeutung des Wortes.' : 'Choose the correct meaning of the word.'}</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
       </Pressable>
@@ -1134,8 +1150,8 @@ export default function GamesView({ words }) {
           <Ionicons name="text" size={26} color={colors.der.text} />
         </View>
         <View style={styles.menuTextWrap}>
-          <Text style={styles.menuTitle}>Artikel raten</Text>
-          <Text style={styles.menuSubtitle}>der, die oder das? Rate den Artikel des Substantivs.</Text>
+          <Text style={styles.menuTitle}>{isDe ? 'Artikel raten' : 'Guess the article'}</Text>
+          <Text style={styles.menuSubtitle}>{isDe ? 'der, die oder das? Rate den Artikel des Substantivs.' : 'Der, die or das? Choose the noun’s article.'}</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
       </Pressable>
@@ -1145,9 +1161,9 @@ export default function GamesView({ words }) {
           <Ionicons name="albums" size={26} color={colors.misc.text} />
         </View>
         <View style={styles.menuTextWrap}>
-          <Text style={styles.menuTitle}>Lernkarten</Text>
+          <Text style={styles.menuTitle}>{isDe ? 'Lernkarten' : 'Flashcards'}</Text>
           <Text style={styles.menuSubtitle}>
-            Ziehe zufällige Karten mit Wort, Bedeutung und Notizen.
+            {isDe ? 'Ziehe zufällige Karten mit Wort, Bedeutung und Notizen.' : 'Review random cards with words, meanings and notes.'}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
@@ -1158,9 +1174,9 @@ export default function GamesView({ words }) {
           <Ionicons name="book" size={26} color={colors.die.text} />
         </View>
         <View style={styles.menuTextWrap}>
-          <Text style={styles.menuTitle}>Meine Geschichte</Text>
+          <Text style={styles.menuTitle}>{isDe ? 'Meine Geschichte' : 'My story'}</Text>
           <Text style={styles.menuSubtitle}>
-            KI schreibt eine Geschichte mit all deinen gespeicherten Wörtern.
+            {isDe ? 'KI schreibt eine Geschichte mit all deinen gespeicherten Wörtern.' : 'AI writes a story using your saved vocabulary.'}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />

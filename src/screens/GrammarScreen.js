@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { checkGrammar } from '../services/wordsService';
 import OutlinedButton from '../components/OutlinedButton';
 
@@ -22,6 +23,8 @@ const WARN = { text: '#c2255c', bg: '#ffdeeb', border: '#c2255c' };
 
 export default function GrammarScreen() {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [sentence, setSentence] = useState('');
   const [result, setResult] = useState(null);
@@ -35,8 +38,8 @@ export default function GrammarScreen() {
       const data = await checkGrammar({ sentence: sentence.trim() });
       setResult(data);
     } catch (err) {
-      const msg = err.response?.data?.error ?? err.message ?? 'Prüfung fehlgeschlagen.';
-      Alert.alert('Fehler', msg);
+      const msg = err.response?.data?.error ?? err.message ?? (isDe ? 'Prüfung fehlgeschlagen.' : 'Grammar check failed.');
+      Alert.alert(isDe ? 'Fehler' : 'Error', msg);
     } finally {
       setLoading(false);
     }
@@ -54,14 +57,14 @@ export default function GrammarScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          <Text style={styles.titleBold}>Mein </Text>
-          <Text style={styles.titleItalic}>Grammatik-Check</Text>
+          <Text style={styles.titleBold}>{isDe ? 'Mein ' : 'My '}</Text>
+          <Text style={styles.titleItalic}>{isDe ? 'Grammatik-Check' : 'Grammar Check'}</Text>
         </Text>
-        <Text style={styles.subtitle}>Ist dein Satz korrekt?</Text>
+        <Text style={styles.subtitle}>{isDe ? 'Ist dein Satz korrekt?' : 'Is your German sentence correct?'}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>DEUTSCHER SATZ</Text>
+        <Text style={styles.label}>{isDe ? 'DEUTSCHER SATZ' : 'GERMAN SENTENCE'}</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           placeholder="z.B. Ich habe gestern ins Kino gegangen."
@@ -73,7 +76,7 @@ export default function GrammarScreen() {
 
         <View style={styles.actionRow}>
           <OutlinedButton
-            title={loading ? 'KI prüft…' : 'Prüfen mit KI'}
+            title={loading ? (isDe ? 'KI prüft…' : 'AI is checking…') : (isDe ? 'Mit KI prüfen' : 'Check with AI')}
             icon="fact-check"
             tone="ai"
             onPress={handleCheck}
@@ -84,7 +87,7 @@ export default function GrammarScreen() {
 
           <Pressable style={styles.clearButton} onPress={reset}>
             <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
-            <Text style={styles.clearButtonText}>Clear All</Text>
+            <Text style={styles.clearButtonText}>{isDe ? 'Alles löschen' : 'Clear all'}</Text>
           </Pressable>
         </View>
 
@@ -102,14 +105,14 @@ export default function GrammarScreen() {
                 color={result.correct ? GOOD.text : WARN.text}
               />
               <Text style={[styles.statusText, { color: result.correct ? GOOD.text : WARN.text }]}>
-                {result.correct ? 'Richtig!' : 'Enthält Fehler'}
+                {result.correct ? (isDe ? 'Richtig!' : 'Correct!') : (isDe ? 'Enthält Fehler' : 'Contains errors')}
               </Text>
             </View>
 
             {showCorrection ? (
               <>
                 <Text style={styles.label}>
-                  {result.correct ? 'KORREKTER SATZ' : 'KORRIGIERTER SATZ'}
+                  {result.correct ? (isDe ? 'KORREKTER SATZ' : 'CORRECT SENTENCE') : (isDe ? 'KORRIGIERTER SATZ' : 'CORRECTED SENTENCE')}
                 </Text>
                 <View style={styles.correctionCard}>
                   <Text style={styles.correctionText}>{result.corrected}</Text>
@@ -119,7 +122,7 @@ export default function GrammarScreen() {
 
             {result.feedback ? (
               <>
-                <Text style={styles.label}>ERKLÄRUNG</Text>
+                <Text style={styles.label}>{isDe ? 'ERKLÄRUNG' : 'EXPLANATION'}</Text>
                 <View style={styles.feedbackCard}>
                   <Text style={styles.feedbackText}>{result.feedback}</Text>
                 </View>

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const voiceCache = new Map();
 
@@ -28,6 +29,8 @@ async function voiceForLanguage(language) {
 
 export default function ReadAloudButton({ text, language = 'en-US', compact = false }) {
   const { colors } = useTheme();
+  const { language: interfaceLanguage } = useLanguage();
+  const isDe = interfaceLanguage === 'de';
   const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => () => {
@@ -63,7 +66,7 @@ export default function ReadAloudButton({ text, language = 'en-US', compact = fa
       disabled={!text?.trim()}
       hitSlop={8}
       accessibilityRole="button"
-      accessibilityLabel={speaking ? 'Aussprache stoppen' : 'Deutsches Wort vorlesen'}
+      accessibilityLabel={speaking ? (isDe ? 'Aussprache stoppen' : 'Stop pronunciation') : (isDe ? 'Deutsches Wort vorlesen' : 'Read German word aloud')}
       style={({ pressed }) => [
         styles.button,
         compact && styles.buttonCompact,
@@ -78,7 +81,7 @@ export default function ReadAloudButton({ text, language = 'en-US', compact = fa
       />
       {!compact ? (
         <Text style={[styles.label, { color: colors.misc.text }]}>
-          {speaking ? 'Stopp' : 'Anhören'}
+          {speaking ? (isDe ? 'Stopp' : 'Stop') : (isDe ? 'Anhören' : 'Listen')}
         </Text>
       ) : null}
     </Pressable>

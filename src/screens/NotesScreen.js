@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import OutlinedButton from '../components/OutlinedButton';
 import {
   addNote,
@@ -39,15 +40,17 @@ function truncatePreview(content) {
   return `${content.slice(0, NOTE_PREVIEW_TRUNCATE_LENGTH)}...`;
 }
 
-function formatNoteDate(value) {
+function formatNoteDate(value, locale) {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return date.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export default function NotesScreen() {
   const { colors } = useTheme();
+  const { language } = useLanguage();
+  const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [mode, setMode] = useState('add');
@@ -70,7 +73,7 @@ export default function NotesScreen() {
       setNotes(fetched);
     } catch (err) {
       const msg = err.response?.data?.error ?? err.message ?? 'Failed to load notes.';
-      Alert.alert('Fehler', msg);
+      Alert.alert(isDe ? 'Fehler' : 'Error', msg);
     } finally {
       setLoading(false);
     }
@@ -96,7 +99,7 @@ export default function NotesScreen() {
       setContent(formatted);
     } catch (err) {
       const msg = err.response?.data?.error ?? err.message ?? 'Could not format this note.';
-      Alert.alert('Formatierung fehlgeschlagen', msg);
+      Alert.alert(isDe ? 'Formatierung fehlgeschlagen' : 'Formatting failed', msg);
     } finally {
       setFormatting(false);
     }
@@ -118,7 +121,7 @@ export default function NotesScreen() {
       }
     } catch (err) {
       const msg = err.response?.data?.error ?? err.message ?? 'Failed to save note.';
-      Alert.alert('Fehler', msg);
+      Alert.alert(isDe ? 'Fehler' : 'Error', msg);
     } finally {
       setSaving(false);
     }
@@ -143,7 +146,7 @@ export default function NotesScreen() {
       await load();
     } catch (err) {
       const msg = err.response?.data?.error ?? err.message ?? 'Failed to delete note.';
-      Alert.alert('Fehler', msg);
+      Alert.alert(isDe ? 'Fehler' : 'Error', msg);
     } finally {
       setDeleting(false);
     }
@@ -153,10 +156,10 @@ export default function NotesScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          <Text style={styles.titleBold}>Meine </Text>
-          <Text style={styles.titleItalic}>Notizen</Text>
+          <Text style={styles.titleBold}>{isDe ? 'Meine ' : 'My '}</Text>
+          <Text style={styles.titleItalic}>{isDe ? 'Notizen' : 'Notes'}</Text>
         </Text>
-        <Text style={styles.subtitle}>Wichtige Notizen, die du täglich findest.</Text>
+        <Text style={styles.subtitle}>{isDe ? 'Wichtige Notizen, die du täglich findest.' : 'Keep useful language notes in one place.'}</Text>
       </View>
 
       <View style={styles.tabRow}>
@@ -168,7 +171,7 @@ export default function NotesScreen() {
             numberOfLines={1}
             style={[styles.tabButtonText, mode === 'add' && styles.tabButtonTextActive]}
           >
-            {editingId ? 'Notiz bearbeiten' : '+ Neue Notiz'}
+            {editingId ? (isDe ? 'Notiz bearbeiten' : 'Edit note') : (isDe ? '+ Neue Notiz' : '+ New note')}
           </Text>
         </Pressable>
         <Pressable
@@ -182,7 +185,7 @@ export default function NotesScreen() {
             numberOfLines={1}
             style={[styles.tabButtonText, mode === 'list' && styles.tabButtonTextActive]}
           >
-            Notizen <Text style={styles.tabBadge}>{notes.length}</Text>
+            {isDe ? 'Notizen' : 'Notes'} <Text style={styles.tabBadge}>{notes.length}</Text>
           </Text>
         </Pressable>
       </View>
@@ -190,19 +193,19 @@ export default function NotesScreen() {
       {mode === 'add' ? (
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.formCard}>
-            <Text style={styles.label}>TITEL *</Text>
+            <Text style={styles.label}>{isDe ? 'TITEL' : 'TITLE'} *</Text>
             <TextInput
               style={styles.input}
-              placeholder="z.B. Meeting notes"
+              placeholder={isDe ? 'z. B. Besprechungsnotizen' : 'e.g. Meeting notes'}
               placeholderTextColor={colors.placeholder}
               value={title}
               onChangeText={setTitle}
             />
 
-            <Text style={styles.label}>INHALT *</Text>
+            <Text style={styles.label}>{isDe ? 'INHALT' : 'CONTENT'} *</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Paste your notes here…"
+              placeholder={isDe ? 'Füge deine Notizen hier ein…' : 'Paste your notes here…'}
               placeholderTextColor={colors.placeholder}
               value={content}
               onChangeText={setContent}
@@ -216,13 +219,13 @@ export default function NotesScreen() {
             >
               <Ionicons name="sparkles" size={15} color={colors.misc.text} />
               <Text style={styles.autofillButtonText}>
-                {formatting ? 'Formatiert…' : 'Format mit KI'}
+                {formatting ? (isDe ? 'Wird formatiert…' : 'Formatting…') : (isDe ? 'Mit KI formatieren' : 'Format with AI')}
               </Text>
             </Pressable>
 
             <View style={styles.actionRow}>
               <OutlinedButton
-                title={saving ? 'Speichern…' : editingId ? 'Änderungen speichern' : 'Notiz speichern'}
+                title={saving ? (isDe ? 'Speichern…' : 'Saving…') : editingId ? (isDe ? 'Änderungen speichern' : 'Save changes') : (isDe ? 'Notiz speichern' : 'Save note')}
                 icon="save"
                 tone="success"
                 onPress={handleSave}
@@ -233,7 +236,7 @@ export default function NotesScreen() {
 
               <Pressable style={styles.clearButton} onPress={resetForm}>
                 <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
-                <Text style={styles.clearButtonText}>Clear</Text>
+                <Text style={styles.clearButtonText}>{isDe ? 'Leeren' : 'Clear'}</Text>
               </Pressable>
             </View>
           </View>
@@ -241,13 +244,13 @@ export default function NotesScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.listHeaderRow}>
-            <Text style={styles.listHeaderText}>GESPEICHERT ({notes.length})</Text>
+            <Text style={styles.listHeaderText}>{isDe ? 'GESPEICHERT' : 'SAVED'} ({notes.length})</Text>
           </View>
 
           {loading ? (
-            <Text style={styles.emptyText}>Lädt…</Text>
+            <Text style={styles.emptyText}>{isDe ? 'Lädt…' : 'Loading…'}</Text>
           ) : notes.length === 0 ? (
-            <Text style={styles.emptyText}>Noch keine Notizen. Füge deine erste Notiz im Tab „Neue Notiz" hinzu!</Text>
+            <Text style={styles.emptyText}>{isDe ? 'Noch keine Notizen. Füge deine erste Notiz im Tab „Neue Notiz“ hinzu!' : 'No notes yet. Add your first note from the New note tab!'}</Text>
           ) : (
             notes.map((note) => (
               <Pressable
@@ -261,8 +264,8 @@ export default function NotesScreen() {
                 <View style={styles.noteCardHeader}>
                   <Text style={styles.noteTitle} numberOfLines={2}>{note.title}</Text>
                   <View style={styles.noteDates}>
-                    <Text style={styles.noteDateText}>Erstellt: {formatNoteDate(note.createdAt)}</Text>
-                    <Text style={styles.noteDateText}>Bearbeitet: {formatNoteDate(note.updatedAt)}</Text>
+                    <Text style={styles.noteDateText}>{isDe ? 'Erstellt' : 'Created'}: {formatNoteDate(note.createdAt, isDe ? 'de-DE' : 'en-US')}</Text>
+                    <Text style={styles.noteDateText}>{isDe ? 'Bearbeitet' : 'Updated'}: {formatNoteDate(note.updatedAt, isDe ? 'de-DE' : 'en-US')}</Text>
                   </View>
                 </View>
                 <Text style={styles.notePreview}>{truncatePreview(note.content)}</Text>
@@ -295,9 +298,9 @@ export default function NotesScreen() {
             {detailNote ? (
               confirmingDelete ? (
                 <>
-                  <Text style={styles.deleteConfirmTitle}>Notiz löschen?</Text>
+                  <Text style={styles.deleteConfirmTitle}>{isDe ? 'Notiz löschen?' : 'Delete note?'}</Text>
                   <Text style={styles.deleteConfirmText}>
-                    Diese Notiz wird dauerhaft gelöscht.
+                    {isDe ? 'Diese Notiz wird dauerhaft gelöscht.' : 'This note will be permanently deleted.'}
                   </Text>
                   <View style={styles.deleteConfirmActions}>
                     <Pressable
@@ -305,7 +308,7 @@ export default function NotesScreen() {
                       onPress={() => setConfirmingDelete(false)}
                       disabled={deleting}
                     >
-                      <Text style={styles.deleteCancelText}>Abbrechen</Text>
+                      <Text style={styles.deleteCancelText}>{isDe ? 'Abbrechen' : 'Cancel'}</Text>
                     </Pressable>
                     <Pressable
                       style={[styles.deleteConfirmButton, deleting && styles.deleteButtonDisabled]}
@@ -314,7 +317,7 @@ export default function NotesScreen() {
                     >
                       <Ionicons name="trash" size={18} color="#fff" />
                       <Text style={styles.deleteConfirmButtonText}>
-                        {deleting ? 'Wird gelöscht…' : 'Löschen'}
+                        {deleting ? (isDe ? 'Wird gelöscht…' : 'Deleting…') : (isDe ? 'Löschen' : 'Delete')}
                       </Text>
                     </Pressable>
                   </View>
@@ -353,7 +356,7 @@ export default function NotesScreen() {
                     setDetailNote(null);
                   }}
                 >
-                  <Text style={styles.modalCloseButtonText}>Schließen</Text>
+                  <Text style={styles.modalCloseButtonText}>{isDe ? 'Schließen' : 'Close'}</Text>
                 </Pressable>
               </>
               )
