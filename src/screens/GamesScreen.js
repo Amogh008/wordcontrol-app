@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { getWords } from '../services/wordsService';
 import GamesView from '../components/GamesView';
+import SpeakingNetworkView from '../components/SpeakingNetworkView';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
@@ -15,6 +16,7 @@ export default function GamesScreen({ active }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [words, setWords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [section, setSection] = useState('games');
   const hasLoaded = useRef(false);
 
   const load = useCallback(async () => {
@@ -45,8 +47,33 @@ export default function GamesScreen({ active }) {
         <Text style={styles.subtitle}>{isDe ? 'Teste dein Deutsch' : 'Test your German'}</Text>
       </View>
 
+      <View style={styles.sectionTabs} accessibilityRole="tablist">
+        <Pressable
+          onPress={() => setSection('games')}
+          style={[styles.sectionTab, section === 'games' && styles.sectionTabActive]}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: section === 'games' }}
+        >
+          <Text style={[styles.sectionTabText, section === 'games' && styles.sectionTabTextActive]}>
+            {isDe ? 'Spiele' : 'Games'}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setSection('network')}
+          style={[styles.sectionTab, section === 'network' && styles.sectionTabActive]}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: section === 'network' }}
+        >
+          <Text style={[styles.sectionTabText, section === 'network' && styles.sectionTabTextActive]}>
+            {isDe ? 'Sprech-Netzwerk' : 'Speaking Network'}
+          </Text>
+        </Pressable>
+      </View>
+
       <View style={styles.body}>
-        {loading && !hasLoaded.current ? (
+        {section === 'network' ? (
+          <SpeakingNetworkView onExit={() => setSection('games')} />
+        ) : loading && !hasLoaded.current ? (
           <Text style={styles.loading}>{isDe ? 'Lädt…' : 'Loading…'}</Text>
         ) : (
           <GamesView words={words} />
@@ -90,6 +117,36 @@ const makeStyles = (colors) => StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 16,
+  },
+  sectionTabs: {
+    flexDirection: 'row',
+    backgroundColor: colors.headerBg,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  sectionTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 38,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#4a4741',
+  },
+  sectionTabActive: {
+    backgroundColor: '#bfeefa',
+    borderColor: '#62d6ee',
+  },
+  sectionTabText: {
+    color: '#cfc9bd',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  sectionTabTextActive: {
+    color: '#155a6a',
   },
   loading: {
     marginTop: 40,
