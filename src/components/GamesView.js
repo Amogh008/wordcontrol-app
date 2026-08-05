@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { localize, localizeFormat } from "../locales";import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -7,22 +7,23 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
-} from 'react-native';
+  View } from
+'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { selectableArticles } from '../theme/colors';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { streamStory, translateText } from '../services/wordsService';
 import ReadAloudButton from './ReadAloudButton';
+import { useLanguageProfile } from '../context/LanguageProfileContext';
+import { languageByCode } from '../languages';
 
 const GOOD = { text: '#2f9e44', bg: '#d3f9d8', border: '#2f9e44' };
 const BAD = { text: '#c92a2a', bg: '#ffe3e3', border: '#c92a2a' };
 const STORY_LEVELS = [
-  { id: 'A1', title: 'A1 · Anfänger', description: 'Sehr kurze, einfache Sätze und vertraute Wörter' },
-  { id: 'A2', title: 'A2 · Grundkenntnisse', description: 'Einfache Sätze mit etwas mehr Abwechslung' },
-  { id: 'B1', title: 'B1 · Mittelstufe', description: 'Natürlichere Sätze und eine ausführlichere Handlung' },
-];
+{ id: 'A1', title: 'A1 · Anfänger', description: 'Sehr kurze, einfache Sätze und vertraute Wörter' },
+{ id: 'A2', title: 'A2 · Grundkenntnisse', description: 'Einfache Sätze mit etwas mehr Abwechslung' },
+{ id: 'B1', title: 'B1 · Mittelstufe', description: 'Natürlichere Sätze und eine ausführlichere Handlung' }];
+
 
 function shuffle(arr) {
   const a = [...arr];
@@ -33,8 +34,14 @@ function shuffle(arr) {
   return a;
 }
 
-function isNoun(w) {
-  return selectableArticles.includes(w.artikel);
+function gameArticleStyle(colors, index) {
+  const dark = colors.pageBg === '#121110';
+  return [
+  colors.der, colors.die, colors.das,
+  dark ? { text: '#ffb86b', bg: '#402d1d' } : { text: '#d9480f', bg: '#ffe8cc' },
+  dark ? { text: '#63e6be', bg: '#163b34' } : { text: '#087f5b', bg: '#c3fae8' },
+  dark ? { text: '#e599f7', bg: '#3b2442' } : { text: '#9c36b5', bg: '#f3d9fa' }][
+  index] || colors.misc;
 }
 
 function Scoreboard({ score, answered, onExit }) {
@@ -46,13 +53,13 @@ function Scoreboard({ score, answered, onExit }) {
     <View style={styles.scoreRow}>
       <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
         <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-        <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
+        <Text style={styles.exitText}>{localize('Games')}</Text>
       </Pressable>
       <Text style={styles.scoreText}>
-        {isDe ? 'Richtig' : 'Correct'}: {score} / {answered}
+        {localize('Correct')}{localize(":")}{score}{localize("/")}{answered}
       </Text>
-    </View>
-  );
+    </View>);
+
 }
 
 function EmptyState({ message, onExit }) {
@@ -63,10 +70,10 @@ function EmptyState({ message, onExit }) {
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyText}>{message}</Text>
       <Pressable onPress={onExit} style={styles.emptyButton}>
-        <Text style={styles.emptyButtonText}>{language === 'de' ? 'Zurück zu Spiele' : 'Back to games'}</Text>
+        <Text style={styles.emptyButtonText}>{localize('Back to games')}</Text>
       </Pressable>
-    </View>
-  );
+    </View>);
+
 }
 
 function Flashcards({ words, onExit }) {
@@ -76,19 +83,19 @@ function Flashcards({ words, onExit }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const pool = useMemo(
     () => words.filter((word) => word.wort && word.bedeutung),
-    [words],
+    [words]
   );
   const [cardIndex, setCardIndex] = useState(() =>
-    pool.length > 0 ? Math.floor(Math.random() * pool.length) : 0,
+  pool.length > 0 ? Math.floor(Math.random() * pool.length) : 0
   );
 
   if (pool.length === 0) {
     return (
       <EmptyState
-        message={isDe ? 'Du brauchst mindestens ein gespeichertes Wort mit Bedeutung für die Lernkarten.' : 'Save at least one word with a meaning to use flashcards.'}
-        onExit={onExit}
-      />
-    );
+        message={localize('Save at least one word with a meaning to use flashcards.')}
+        onExit={onExit} />);
+
+
   }
 
   const card = pool[cardIndex % pool.length];
@@ -111,13 +118,13 @@ function Flashcards({ words, onExit }) {
       <View style={styles.scoreRow}>
         <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
           <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-          <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
+          <Text style={styles.exitText}>{localize('Games')}</Text>
         </Pressable>
-        <Text style={styles.scoreText}>{pool.length} {isDe ? 'Lernkarten' : 'flashcards'}</Text>
+        <Text style={styles.scoreText}>{pool.length} {localize('flashcards')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.flashcardBody}>
-        <Text style={styles.questionLabel}>{isDe ? 'Zufällige Lernkarte' : 'Random flashcard'}</Text>
+        <Text style={styles.questionLabel}>{localize('Random flashcard')}</Text>
         <View style={[styles.flashcard, { borderColor: articleColors.text }]}>
           <View style={[styles.flashcardBadge, { backgroundColor: articleColors.bg }]}>
             <Text style={[styles.flashcardBadgeText, { color: articleColors.text }]}>
@@ -131,24 +138,24 @@ function Flashcards({ words, onExit }) {
 
           <View style={styles.flashcardDivider} />
 
-          <Text style={styles.flashcardLabel}>{isDe ? 'BEDEUTUNG' : 'MEANING'}</Text>
+          <Text style={styles.flashcardLabel}>{localize('MEANING')}</Text>
           <Text style={styles.flashcardMeaning}>{card.bedeutung}</Text>
 
-          {card.notizen ? (
-            <>
-              <Text style={styles.flashcardLabel}>{isDe ? 'NOTIZEN' : 'NOTES'}</Text>
+          {card.notizen ?
+          <>
+              <Text style={styles.flashcardLabel}>{localize('NOTES')}</Text>
               <Text style={styles.flashcardNotes}>{card.notizen}</Text>
-            </>
-          ) : null}
+            </> :
+          null}
         </View>
 
         <Pressable style={styles.flashcardNextButton} onPress={drawNext}>
           <Ionicons name="shuffle" size={19} color={colors.misc.text} />
-          <Text style={styles.flashcardNextText}>{isDe ? 'Nächste zufällige Karte' : 'Next random card'}</Text>
+          <Text style={styles.flashcardNextText}>{localize('Next random card')}</Text>
         </Pressable>
       </ScrollView>
-    </View>
-  );
+    </View>);
+
 }
 
 function InteractiveParagraph({
@@ -156,61 +163,61 @@ function InteractiveParagraph({
   words,
   onPress,
   translationMode = false,
-  onTranslate,
+  onTranslate
 }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const lookup = useMemo(
     () =>
-      new Map(
-        words
-          .filter((word) => word.wort)
-          .map((word) => [word.wort.toLocaleLowerCase('de-DE'), word]),
+    new Map(
+      words.
+      filter((word) => word.wort).
+      map((word) => [word.wort.toLocaleLowerCase('de-DE'), word])
     ),
-    [words],
+    [words]
   );
   const sentences = useMemo(
     () => paragraph.match(/[^.!?…]+(?:[.!?…]+["'»“”]?|$)\s*/gu) || [paragraph],
-    [paragraph],
+    [paragraph]
   );
 
   return (
     <Text style={styles.storyParagraph}>
-      {sentences.map((sentence, sentenceIndex) => (
-        <Text
-          key={`${sentenceIndex}-${sentence.slice(0, 20)}`}
-          onPress={translationMode ? () => onTranslate(sentence.trim()) : undefined}
-        >
+      {sentences.map((sentence, sentenceIndex) =>
+      <Text
+        key={`${sentenceIndex}-${sentence.slice(0, 20)}`}
+        onPress={translationMode ? () => onTranslate(sentence.trim()) : undefined}>
+
           {sentence.split(/(\p{L}+(?:[’'-]\p{L}+)*)/gu).map((part, partIndex) => {
-            if (!/^\p{L}/u.test(part)) {
-              return <Text key={`${partIndex}-${part}`}>{part}</Text>;
-            }
-            const savedWord = lookup.get(part.toLocaleLowerCase('de-DE'));
-            const word = savedWord ?? { wort: part };
-            return (
-              <Text
-                key={`${partIndex}-${part}`}
-                style={[
-                  styles.storyClickableWord,
-                  savedWord && styles.storyInteractiveWord,
-                ]}
-                onPress={
-                  translationMode
-                    ? undefined
-                    : (event) => {
-                        event.stopPropagation();
-                        onPress(word);
-                      }
-                }
-              >
+          if (!/^\p{L}/u.test(part)) {
+            return <Text key={`${partIndex}-${part}`}>{part}</Text>;
+          }
+          const savedWord = lookup.get(part.toLocaleLowerCase('de-DE'));
+          const word = savedWord ?? { wort: part };
+          return (
+            <Text
+              key={`${partIndex}-${part}`}
+              style={[
+              styles.storyClickableWord,
+              savedWord && styles.storyInteractiveWord]
+              }
+              onPress={
+              translationMode ?
+              undefined :
+              (event) => {
+                event.stopPropagation();
+                onPress(word);
+              }
+              }>
+
                 {part}
-              </Text>
-            );
-          })}
+              </Text>);
+
+        })}
         </Text>
-      ))}
-    </Text>
-  );
+      )}
+    </Text>);
+
 }
 
 function TranslatableParagraph({ paragraph, words, onTranslate }) {
@@ -219,9 +226,9 @@ function TranslatableParagraph({ paragraph, words, onTranslate }) {
       paragraph={paragraph}
       words={words}
       translationMode
-      onTranslate={onTranslate}
-    />
-  );
+      onTranslate={onTranslate} />);
+
+
 }
 
 function StoryActivity({ words, onExit }) {
@@ -231,7 +238,7 @@ function StoryActivity({ words, onExit }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const vocabulary = useMemo(
     () => words.filter((word) => word.wort && word.bedeutung),
-    [words],
+    [words]
   );
   const [story, setStory] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -277,7 +284,7 @@ function StoryActivity({ words, onExit }) {
         onDelta: (text) => {
           streamedText += text;
           setStory(storyFromStreamText(streamedText));
-        },
+        }
       });
       setStory(completedStory);
       setUsedWords((current) => {
@@ -286,10 +293,10 @@ function StoryActivity({ words, onExit }) {
       });
       const completedIds = new Set(batch.map((word) => String(word.id ?? word._id)));
       setRemainingWords((current) =>
-        current.filter((word) => !completedIds.has(String(word.id ?? word._id))),
+      current.filter((word) => !completedIds.has(String(word.id ?? word._id)))
       );
     } catch (err) {
-      setError(err.message ?? (isDe ? 'Die Geschichte konnte nicht erstellt werden.' : 'The story could not be created.'));
+      setError(err.message ?? localize('The story could not be created.'));
     } finally {
       setLoading(false);
     }
@@ -314,10 +321,10 @@ function StoryActivity({ words, onExit }) {
   if (vocabulary.length === 0) {
     return (
       <EmptyState
-        message={isDe ? 'Speichere mindestens ein Wort mit Bedeutung, um eine Geschichte zu erstellen.' : 'Save at least one word with a meaning to create a story.'}
-        onExit={onExit}
-      />
-    );
+        message={localize('Save at least one word with a meaning to create a story.')}
+        onExit={onExit} />);
+
+
   }
 
   if (!level) {
@@ -326,30 +333,30 @@ function StoryActivity({ words, onExit }) {
         <View style={styles.scoreRow}>
           <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
             <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-            <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
+            <Text style={styles.exitText}>{localize('Games')}</Text>
           </Pressable>
         </View>
         <View style={styles.storyLevelScreen}>
           <Ionicons name="book-outline" size={34} color={colors.misc.text} />
-          <Text style={styles.storyLevelTitle}>{isDe ? 'Wähle dein Sprachniveau' : 'Choose your language level'}</Text>
+          <Text style={styles.storyLevelTitle}>{localize('Choose your language level')}</Text>
           <Text style={styles.storyLevelIntro}>
-            {isDe ? 'Die Geschichte wird passend zu deinem aktuellen Deutsch-Niveau geschrieben.' : 'The story will match your current German level.'}
+            {localize('The story will match your current German level.')}
           </Text>
           <View style={styles.storyLevelOptions}>
-            {STORY_LEVELS.map((option) => (
-              <Pressable
-                key={option.id}
-                style={({ pressed }) => [
-                  styles.storyLevelOption,
-                  pressed && styles.storyLevelOptionPressed,
-                ]}
-                onPress={() => {
-                  setLevel(option.id);
-                  createStory(remainingWords.slice(0, 30), option.id);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`${option.title}: ${option.description}`}
-              >
+            {STORY_LEVELS.map((option) =>
+            <Pressable
+              key={option.id}
+              style={({ pressed }) => [
+              styles.storyLevelOption,
+              pressed && styles.storyLevelOptionPressed]
+              }
+              onPress={() => {
+                setLevel(option.id);
+                createStory(remainingWords.slice(0, 30), option.id);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${option.title}: ${option.description}`}>
+
                 <View style={styles.storyLevelBadge}>
                   <Text style={styles.storyLevelBadgeText}>{option.id}</Text>
                 </View>
@@ -359,17 +366,17 @@ function StoryActivity({ words, onExit }) {
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
               </Pressable>
-            ))}
+            )}
           </View>
         </View>
-      </View>
-    );
+      </View>);
+
   }
 
   const handleWordPress = async (word) => {
     const id = word.id ?? word._id ?? word.wort;
     const currentId =
-      activeWord?.word?.id ?? activeWord?.word?._id ?? activeWord?.word?.wort;
+    activeWord?.word?.id ?? activeWord?.word?._id ?? activeWord?.word?.wort;
     if (activeWord?.pinned && currentId === id) {
       wordMeaningRequest.current += 1;
       setActiveWord(null);
@@ -387,7 +394,7 @@ function StoryActivity({ words, onExit }) {
     if (cachedMeaning) {
       setActiveWord({
         word: { ...word, bedeutung: cachedMeaning },
-        pinned: true,
+        pinned: true
       });
       return;
     }
@@ -399,7 +406,7 @@ function StoryActivity({ words, onExit }) {
       const { translation: meaning } = await translateText({
         text: word.wort,
         from: 'de',
-        to: 'en',
+        to: 'en'
       });
       if (wordMeaningRequest.current === requestId) {
         wordMeaningCache.current.set(cacheKey, meaning);
@@ -407,7 +414,7 @@ function StoryActivity({ words, onExit }) {
           word: { ...word, bedeutung: meaning },
           pinned: true,
           loading: false,
-          error: '',
+          error: ''
         });
       }
     } catch (err) {
@@ -417,9 +424,9 @@ function StoryActivity({ words, onExit }) {
           pinned: true,
           loading: false,
           error:
-            err.response?.data?.error ??
-            err.message ??
-            'Die Bedeutung konnte nicht geladen werden.',
+          err.response?.data?.error ??
+          err.message ??
+          'Die Bedeutung konnte nicht geladen werden.'
         });
       }
     }
@@ -440,7 +447,7 @@ function StoryActivity({ words, onExit }) {
       const { translation: translatedText } = await translateText({
         text: source,
         from: 'de',
-        to: 'en',
+        to: 'en'
       });
       if (translationRequest.current === requestId) {
         setTranslation({ source, text: translatedText, loading: false, error: '' });
@@ -451,7 +458,7 @@ function StoryActivity({ words, onExit }) {
           source,
           text: '',
           loading: false,
-          error: err.response?.data?.error ?? err.message ?? 'Übersetzung fehlgeschlagen.',
+          error: err.response?.data?.error ?? err.message ?? 'Übersetzung fehlgeschlagen.'
         });
       }
     }
@@ -473,166 +480,166 @@ function StoryActivity({ words, onExit }) {
         if (!activeWord) return;
         wordMeaningRequest.current += 1;
         setActiveWord(null);
-      }}
-    >
+      }}>
+
       <View style={styles.scoreRow}>
         <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
           <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-          <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
+          <Text style={styles.exitText}>{localize('Games')}</Text>
         </Pressable>
         <Pressable style={styles.storyResetButton} onPress={resetSession} disabled={loading}>
           <Ionicons name="refresh" size={16} color={colors.misc.text} />
-          <Text style={styles.storyResetText}>{isDe ? 'Sitzung zurücksetzen' : 'Reset session'}</Text>
+          <Text style={styles.storyResetText}>{localize('Reset session')}</Text>
         </Pressable>
       </View>
 
-      {story?.title ? (
-        <View style={styles.storyStickyControls}>
+      {story?.title ?
+      <View style={styles.storyStickyControls}>
           <Pressable
-            style={[
-              styles.storyTranslateToggle,
-              translationMode && styles.storyTranslateToggleActive,
-            ]}
-            onPress={toggleTranslationMode}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: translationMode }}
-            accessibilityLabel="Satz übersetzen"
-          >
+          style={[
+          styles.storyTranslateToggle,
+          translationMode && styles.storyTranslateToggleActive]
+          }
+          onPress={toggleTranslationMode}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: translationMode }}
+          accessibilityLabel={localize("Satz \xFCbersetzen")}>
+
             <Text
-              style={[
-                styles.storyTranslateToggleText,
-                translationMode && styles.storyTranslateToggleTextActive,
-              ]}
-            >
-              {isDe ? 'Satz übersetzen' : 'Translate sentence'}
+            style={[
+            styles.storyTranslateToggleText,
+            translationMode && styles.storyTranslateToggleTextActive]
+            }>
+
+              {localize('Translate sentence')}
             </Text>
             <View
-              style={[
-                styles.storyTranslateSwitchTrack,
-                translationMode && styles.storyTranslateSwitchTrackActive,
-              ]}
-            >
+            style={[
+            styles.storyTranslateSwitchTrack,
+            translationMode && styles.storyTranslateSwitchTrackActive]
+            }>
+
               <View
-                style={[
-                  styles.storyTranslateSwitchThumb,
-                  translationMode && styles.storyTranslateSwitchThumbActive,
-                ]}
-              />
+              style={[
+              styles.storyTranslateSwitchThumb,
+              translationMode && styles.storyTranslateSwitchThumbActive]
+              } />
+
             </View>
           </Pressable>
-          {translationMode ? (
-            <Text style={styles.storyTranslateHint}>
-              {isDe ? 'Tippe auf einen Satz oder markiere einen beliebigen Textabschnitt.' : 'Tap a sentence or select any section of text.'}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
+          {translationMode ?
+        <Text style={styles.storyTranslateHint}>
+              {localize('Tap a sentence or select any section of text.')}
+            </Text> :
+        null}
+        </View> :
+      null}
 
-      {loading && !story?.title ? (
-        <View style={styles.storyLoading}>
+      {loading && !story?.title ?
+      <View style={styles.storyLoading}>
           <ActivityIndicator size="large" color={colors.misc.text} />
-          <Text style={styles.storyLoadingText}>KI schreibt deine Geschichte…</Text>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.storyBody}>
+          <Text style={styles.storyLoadingText}>{localize("KI schreibt deine Geschichte\u2026")}</Text>
+        </View> :
+
+      <ScrollView contentContainerStyle={styles.storyBody}>
           <Pressable
-            style={styles.storyProgressLink}
-            onPress={() => setShowSessionWords(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Verwendete Wörter dieser Runde und Sitzung anzeigen"
-          >
+          style={styles.storyProgressLink}
+          onPress={() => setShowSessionWords(true)}
+          accessibilityRole="button"
+          accessibilityLabel={localize("Verwendete W\xF6rter dieser Runde und Sitzung anzeigen")}>
+
             <Ionicons name="list-circle-outline" size={19} color={colors.misc.text} />
             <Text style={styles.storyProgressLinkText}>
-              {roundWords.length} Wörter in dieser Runde · {usedWords.length}/{vocabulary.length} in
-              der Sitzung
-            </Text>
-          </Pressable>
-          {!loading && error ? (
-            <View style={styles.storyError}>
-              <Text style={styles.storyErrorText}>{error}</Text>
-            </View>
-          ) : null}
+              {roundWords.length}{localize("W\xF6rter in dieser Runde \xB7")}{usedWords.length}{localize("/")}{vocabulary.length}{localize("in\n              der Sitzung")}
 
-          {story?.title ? (
-            <>
+          </Text>
+          </Pressable>
+          {!loading && error ?
+        <View style={styles.storyError}>
+              <Text style={styles.storyErrorText}>{error}</Text>
+            </View> :
+        null}
+
+          {story?.title ?
+        <>
               <View style={styles.storyPaper}>
                 <Text style={styles.storyTitle}>{story.title}</Text>
                 <View style={styles.storyTitleRule} />
-                {story.paragraphs.map((paragraph, index) => (
-                  <View key={`${index}-${paragraph.slice(0, 24)}`} style={styles.storyParagraphWrap}>
-                    {translationMode ? (
-                      <TranslatableParagraph
-                        paragraph={paragraph}
-                        words={vocabulary}
-                        onTranslate={handleTranslate}
-                      />
-                    ) : (
-                      <InteractiveParagraph
-                        paragraph={paragraph}
-                        words={vocabulary}
-                        onPress={handleWordPress}
-                      />
-                    )}
-                  </View>
-                ))}
-              </View>
-            </>
-          ) : null}
+                {story.paragraphs.map((paragraph, index) =>
+            <View key={`${index}-${paragraph.slice(0, 24)}`} style={styles.storyParagraphWrap}>
+                    {translationMode ?
+              <TranslatableParagraph
+                paragraph={paragraph}
+                words={vocabulary}
+                onTranslate={handleTranslate} /> :
 
-          {!loading && error ? (
-            <Pressable
-              style={[styles.storyGenerateButton, loading && styles.storyGenerateButtonDisabled]}
-              onPress={() => createStory(roundWords)}
-              disabled={loading}
-            >
+
+              <InteractiveParagraph
+                paragraph={paragraph}
+                words={vocabulary}
+                onPress={handleWordPress} />
+
+              }
+                  </View>
+            )}
+              </View>
+            </> :
+        null}
+
+          {!loading && error ?
+        <Pressable
+          style={[styles.storyGenerateButton, loading && styles.storyGenerateButtonDisabled]}
+          onPress={() => createStory(roundWords)}
+          disabled={loading}>
+
               <Ionicons name="refresh" size={18} color={colors.misc.text} />
-              <Text style={styles.storyGenerateText}>Diese Runde erneut versuchen</Text>
-            </Pressable>
-          ) : !loading && story && remainingWords.length > 0 ? (
-            <Pressable
-              style={[styles.storyGenerateButton, loading && styles.storyGenerateButtonDisabled]}
-              onPress={continueSession}
-              disabled={loading}
-            >
+              <Text style={styles.storyGenerateText}>{localize("Diese Runde erneut versuchen")}</Text>
+            </Pressable> :
+        !loading && story && remainingWords.length > 0 ?
+        <Pressable
+          style={[styles.storyGenerateButton, loading && styles.storyGenerateButtonDisabled]}
+          onPress={continueSession}
+          disabled={loading}>
+
               <Ionicons name="sparkles" size={18} color={colors.misc.text} />
-              <Text style={styles.storyGenerateText}>
-                Weiter mit den nächsten {Math.min(30, remainingWords.length)} Wörtern
-              </Text>
-            </Pressable>
-          ) : !loading && story && usedWords.length === vocabulary.length ? (
-            <View style={styles.storySessionComplete}>
+              <Text style={styles.storyGenerateText}>{localize("Weiter mit den n\xE4chsten")}
+            {Math.min(30, remainingWords.length)}{localize("W\xF6rtern")}
+          </Text>
+            </Pressable> :
+        !loading && story && usedWords.length === vocabulary.length ?
+        <View style={styles.storySessionComplete}>
               <Ionicons name="checkmark-circle" size={21} color={GOOD.text} />
-              <Text style={styles.storySessionCompleteText}>
-                Alle {vocabulary.length} Wörter wurden in dieser Sitzung verwendet.
-              </Text>
-            </View>
-          ) : null}
+              <Text style={styles.storySessionCompleteText}>{localize("Alle")}
+            {vocabulary.length}{localize("W\xF6rter wurden in dieser Sitzung verwendet.")}
+          </Text>
+            </View> :
+        null}
         </ScrollView>
-      )}
+      }
 
       <Modal
         visible={showSessionWords}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowSessionWords(false)}
-      >
-        <Pressable style={styles.storyModalBackdrop} onPress={() => setShowSessionWords(false)}>
+        onRequestClose={() => setShowSessionWords(false)}>
+
+        <Pressable style={styles.storyModalBackdrop} onPress={() => {}}>
           <Pressable style={styles.storyModalCard} onPress={(event) => event.stopPropagation()}>
             <View style={styles.wordMeaningHeader}>
-              <Text style={styles.storyModalTitle}>Wörter dieser Sitzung</Text>
+              <Text style={styles.storyModalTitle}>{localize("W\xF6rter dieser Sitzung")}</Text>
               <Pressable onPress={() => setShowSessionWords(false)} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textMuted} />
               </Pressable>
             </View>
             <ScrollView style={styles.storyModalScroll}>
-              <Text style={styles.storyModalSection}>
-                Diese Runde ({roundWords.length})
+              <Text style={styles.storyModalSection}>{localize("Diese Runde (")}
+                {roundWords.length}{localize(")")}
               </Text>
               <Text style={styles.storyModalWords}>
                 {roundWords.map((word) => word.wort).join(' · ') || 'Noch keine Wörter'}
               </Text>
-              <Text style={styles.storyModalSection}>
-                Bisher verwendet ({usedWords.length} von {vocabulary.length})
+              <Text style={styles.storyModalSection}>{localize("Bisher verwendet (")}
+                {usedWords.length}{localize("von")}{vocabulary.length}{localize(")")}
               </Text>
               <Text style={styles.storyModalWords}>
                 {usedWords.map((word) => word.wort).join(' · ') || 'Noch keine Wörter'}
@@ -642,75 +649,75 @@ function StoryActivity({ words, onExit }) {
         </Pressable>
       </Modal>
 
-      {activeWord ? (
-          <Pressable
-            style={styles.wordMeaningOverlay}
-            onPress={(event) => event.stopPropagation()}
-          >
+      {activeWord ?
+      <Pressable
+        style={styles.wordMeaningOverlay}
+        onPress={(event) => event.stopPropagation()}>
+
           <View style={styles.wordMeaningHeader}>
             <Text style={styles.wordMeaningTitle}>
-              {activeWord.word.artikel
-                ? `${activeWord.word.artikel} ${activeWord.word.wort}`
-                : activeWord.word.wort}
+              {activeWord.word.artikel ?
+            `${activeWord.word.artikel} ${activeWord.word.wort}` :
+            activeWord.word.wort}
             </Text>
             <View style={styles.wordMeaningActions}>
               <ReadAloudButton
-                text={
-                  activeWord.word.artikel
-                    ? `${activeWord.word.artikel} ${activeWord.word.wort}`
-                    : activeWord.word.wort
-                }
-                language="de-DE"
-                compact
-              />
-              {activeWord.pinned ? (
-                <Pressable
-                  onPress={() => {
-                    wordMeaningRequest.current += 1;
-                    setActiveWord(null);
-                  }}
-                  hitSlop={8}
-                >
+              text={
+              activeWord.word.artikel ?
+              `${activeWord.word.artikel} ${activeWord.word.wort}` :
+              activeWord.word.wort
+              }
+              language="de-DE"
+              compact />
+
+              {activeWord.pinned ?
+            <Pressable
+              onPress={() => {
+                wordMeaningRequest.current += 1;
+                setActiveWord(null);
+              }}
+              hitSlop={8}>
+
                   <Ionicons name="close" size={20} color={colors.textMuted} />
-                </Pressable>
-              ) : null}
+                </Pressable> :
+            null}
             </View>
           </View>
-          {activeWord.loading ? (
-            <View style={styles.translationLoading}>
+          {activeWord.loading ?
+        <View style={styles.translationLoading}>
               <ActivityIndicator size="small" color={colors.misc.text} />
-              <Text style={styles.translationLoadingText}>Bedeutung wird geladen…</Text>
-            </View>
-          ) : activeWord.error ? (
-            <Text style={styles.translationError}>{activeWord.error}</Text>
-          ) : (
-            <Text style={styles.wordMeaningText}>{activeWord.word.bedeutung}</Text>
-          )}
-          {activeWord.word.notizen ? (
-            <Text style={styles.wordMeaningNotes} numberOfLines={3}>
-              {activeWord.word.notizen}
-            </Text>
-          ) : null}
-          </Pressable>
-      ) : null}
+              <Text style={styles.translationLoadingText}>{localize("Bedeutung wird geladen\u2026")}</Text>
+            </View> :
+        activeWord.error ?
+        <Text style={styles.translationError}>{activeWord.error}</Text> :
 
-      {translation ? (
-        <View style={styles.wordMeaningOverlay}>
+        <Text style={styles.wordMeaningText}>{activeWord.word.bedeutung}</Text>
+        }
+          {activeWord.word.notizen ?
+        <Text style={styles.wordMeaningNotes} numberOfLines={3}>
+              {activeWord.word.notizen}
+            </Text> :
+        null}
+          </Pressable> :
+      null}
+
+      {translation ?
+      <View style={styles.wordMeaningOverlay}>
           <View style={styles.wordMeaningHeader}>
-            <Text style={styles.translationOverlayLabel}>DE → EN</Text>
+            <Text style={styles.translationOverlayLabel}>{localize("DE \u2192 EN")}</Text>
             <View style={styles.wordMeaningActions}>
               <ReadAloudButton
-                text={translation.source}
-                language="de-DE"
-                compact
-              />
+              text={translation.source}
+              language="de-DE"
+              compact />
+
               <Pressable
-                onPress={() => {
-                  translationRequest.current += 1;
-                  setTranslation(null);
-                }}
-                hitSlop={8}
-              >
+              onPress={() => {
+                translationRequest.current += 1;
+                setTranslation(null);
+              }}
+              hitSlop={8}>
+
                 <Ionicons name="close" size={20} color={colors.textMuted} />
               </Pressable>
             </View>
@@ -718,26 +725,28 @@ function StoryActivity({ words, onExit }) {
           <Text style={styles.translationSource} numberOfLines={3}>
             {translation.source}
           </Text>
-          {translation.loading ? (
-            <View style={styles.translationLoading}>
+          {translation.loading ?
+        <View style={styles.translationLoading}>
               <ActivityIndicator size="small" color={colors.misc.text} />
-              <Text style={styles.translationLoadingText}>Wird übersetzt…</Text>
-            </View>
-          ) : (
-            <Text style={translation.error ? styles.translationError : styles.wordMeaningText}>
+              <Text style={styles.translationLoadingText}>{localize("Wird \xFCbersetzt\u2026")}</Text>
+            </View> :
+
+        <Text style={translation.error ? styles.translationError : styles.wordMeaningText}>
               {translation.error || translation.text}
             </Text>
-          )}
-        </View>
-      ) : null}
-    </Pressable>
-  );
+        }
+        </View> :
+      null}
+    </Pressable>);
+
 }
 
 function MeaningGame({ words, onExit }) {
   const { colors } = useTheme();
   const { language } = useLanguage();
   const isDe = language === 'de';
+  const { activeProfile } = useLanguageProfile();
+  const profileArticles = languageByCode(activeProfile?.language)?.articles || [];
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const pool = useMemo(() => words.filter((w) => w.wort && w.bedeutung), [words]);
   const [round, setRound] = useState(0);
@@ -749,13 +758,13 @@ function MeaningGame({ words, onExit }) {
     if (pool.length < 2) return null;
     const correct = pool[Math.floor(Math.random() * pool.length)];
     const distractors = shuffle(
-      pool
-        .filter((w) => (w.id ?? w._id) !== (correct.id ?? correct._id))
-        .map((w) => w.bedeutung)
-        .filter((b) => b && b !== correct.bedeutung)
-    )
-      .filter((b, i, a) => a.indexOf(b) === i)
-      .slice(0, 3);
+      pool.
+      filter((w) => (w.id ?? w._id) !== (correct.id ?? correct._id)).
+      map((w) => w.bedeutung).
+      filter((b) => b && b !== correct.bedeutung)
+    ).
+    filter((b, i, a) => a.indexOf(b) === i).
+    slice(0, 3);
     return { correct, options: shuffle([correct.bedeutung, ...distractors]) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pool, round]);
@@ -763,10 +772,10 @@ function MeaningGame({ words, onExit }) {
   if (!question) {
     return (
       <EmptyState
-        message={isDe ? 'Du brauchst mindestens 2 Wörter mit Bedeutung, um dieses Spiel zu spielen.' : 'Save at least two words with meanings to play this game.'}
-        onExit={onExit}
-      />
-    );
+        message={localize('Save at least two words with meanings to play this game.')}
+        onExit={onExit} />);
+
+
   }
 
   const answer = (option) => {
@@ -781,15 +790,15 @@ function MeaningGame({ words, onExit }) {
     setRound((r) => r + 1);
   };
 
-  const prompt = question.correct.artikel
-    ? `${question.correct.artikel} ${question.correct.wort}`
-    : question.correct.wort;
+  const prompt = profileArticles.includes(question.correct.artikel) ?
+  `${question.correct.artikel} ${question.correct.wort}` :
+  question.correct.wort;
 
   return (
     <View style={styles.gameArea}>
       <Scoreboard score={score} answered={answered} onExit={onExit} />
       <ScrollView contentContainerStyle={styles.gameBody} keyboardShouldPersistTaps="handled">
-        <Text style={styles.questionLabel}>{isDe ? 'Was bedeutet …' : 'What does this mean?'}</Text>
+        <Text style={styles.questionLabel}>{localize('What does this mean?')}</Text>
         <View style={styles.promptCard}>
           <Text style={styles.promptWord}>{prompt}</Text>
         </View>
@@ -815,35 +824,37 @@ function MeaningGame({ words, onExit }) {
               key={option}
               style={[styles.option, optStyle]}
               onPress={() => answer(option)}
-              disabled={!!selected}
-            >
+              disabled={!!selected}>
+
               <Text style={[styles.optionText, optTextStyle]}>{option}</Text>
-              {selected && isCorrect ? (
-                <Ionicons name="checkmark-circle" size={20} color={GOOD.text} />
-              ) : null}
-              {selected && isChosen && !isCorrect ? (
-                <Ionicons name="close-circle" size={20} color={BAD.text} />
-              ) : null}
-            </Pressable>
-          );
+              {selected && isCorrect ?
+              <Ionicons name="checkmark-circle" size={20} color={GOOD.text} /> :
+              null}
+              {selected && isChosen && !isCorrect ?
+              <Ionicons name="close-circle" size={20} color={BAD.text} /> :
+              null}
+            </Pressable>);
+
         })}
 
-        {selected ? (
-          <Pressable style={styles.nextButton} onPress={next}>
-            <Text style={styles.nextButtonText}>{isDe ? 'Weiter' : 'Next'}</Text>
-          </Pressable>
-        ) : null}
+        {selected ?
+        <Pressable style={styles.nextButton} onPress={next}>
+            <Text style={styles.nextButtonText}>{localize('Next')}</Text>
+          </Pressable> :
+        null}
       </ScrollView>
-    </View>
-  );
+    </View>);
+
 }
 
 function ArtikelGame({ words, onExit }) {
   const { colors } = useTheme();
   const { language } = useLanguage();
   const isDe = language === 'de';
+  const { activeProfile } = useLanguageProfile();
+  const profileArticles = languageByCode(activeProfile?.language)?.articles || [];
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const pool = useMemo(() => words.filter(isNoun), [words]);
+  const pool = useMemo(() => words.filter((word) => profileArticles.includes(word.artikel)), [words, profileArticles]);
   const [round, setRound] = useState(0);
   const [selected, setSelected] = useState(null);
   const [score, setScore] = useState(0);
@@ -858,10 +869,10 @@ function ArtikelGame({ words, onExit }) {
   if (!question) {
     return (
       <EmptyState
-        message={isDe ? 'Du brauchst mindestens ein Substantiv mit Artikel (der/die/das), um dieses Spiel zu spielen.' : 'Save at least one noun with an article (der/die/das) to play.'}
-        onExit={onExit}
-      />
-    );
+        message={localizeFormat("Save at least one word with an article ({0}) to play.", [profileArticles.join('/')])}
+        onExit={onExit} />);
+
+
   }
 
   const answer = (artikel) => {
@@ -880,19 +891,19 @@ function ArtikelGame({ words, onExit }) {
     <View style={styles.gameArea}>
       <Scoreboard score={score} answered={answered} onExit={onExit} />
       <ScrollView contentContainerStyle={styles.gameBody}>
-        <Text style={styles.questionLabel}>{isDe ? 'Welcher Artikel?' : 'Which article?'}</Text>
+        <Text style={styles.questionLabel}>{localize('Which article?')}</Text>
         <View style={styles.promptCard}>
           <Text style={styles.promptWord}>{question.wort}</Text>
-          {question.bedeutung ? (
-            <Text style={styles.promptMeaning}>{question.bedeutung}</Text>
-          ) : null}
+          {question.bedeutung ?
+          <Text style={styles.promptMeaning}>{question.bedeutung}</Text> :
+          null}
         </View>
 
         <View style={styles.artikelRow}>
-          {selectableArticles.map((artikel) => {
+          {profileArticles.map((artikel, articleIndex) => {
             const isCorrect = artikel === question.artikel;
             const isChosen = artikel === selected;
-            const base = colors[artikel];
+            const base = gameArticleStyle(colors, articleIndex);
             let boxStyle = { backgroundColor: base.bg, borderColor: base.bg };
             let txtColor = base.text;
             if (selected) {
@@ -911,37 +922,37 @@ function ArtikelGame({ words, onExit }) {
                 key={artikel}
                 style={[styles.artikelButton, boxStyle]}
                 onPress={() => answer(artikel)}
-                disabled={!!selected}
-              >
+                disabled={!!selected}>
+
                 <Text style={[styles.artikelButtonText, { color: txtColor }]}>{artikel}</Text>
-              </Pressable>
-            );
+              </Pressable>);
+
           })}
         </View>
 
-        {selected ? (
-          <>
+        {selected ?
+        <>
             <Text style={[styles.feedbackText, { color: selected === question.artikel ? GOOD.text : BAD.text }]}>
-              {selected === question.artikel
-                ? (isDe ? 'Richtig!' : 'Correct!')
-                : (isDe ? `Falsch — es ist "${question.artikel} ${question.wort}".` : `Incorrect — it is “${question.artikel} ${question.wort}”.`)}
+              {selected === question.artikel ? localize(
+              'Correct!') : localizeFormat("Incorrect \u2014 it is \u201C{0} {1}\u201D.", [
+            question.artikel, question.wort])}
             </Text>
             <Pressable style={styles.nextButton} onPress={next}>
-              <Text style={styles.nextButtonText}>{isDe ? 'Weiter' : 'Next'}</Text>
+              <Text style={styles.nextButtonText}>{localize('Next')}</Text>
             </Pressable>
-          </>
-        ) : null}
+          </> :
+        null}
       </ScrollView>
-    </View>
-  );
+    </View>);
+
 }
 
 function normalizeAnswer(value) {
-  return value
-    .trim()
-    .toLocaleLowerCase('de-DE')
-    .replace(/^(der|die|das)\s+/, '')
-    .replace(/[.!?,;:]/g, '');
+  return value.
+  trim().
+  toLocaleLowerCase('de-DE').
+  replace(/^(der|die|das)\s+/, '').
+  replace(/[.!?,;:]/g, '');
 }
 
 function WordQuest({ words, onExit }) {
@@ -951,7 +962,7 @@ function WordQuest({ words, onExit }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const vocabulary = useMemo(
     () => words.filter((word) => word.wort && word.bedeutung),
-    [words],
+    [words]
   );
   const [queue, setQueue] = useState(() => shuffle(vocabulary));
   const [answer, setAnswer] = useState('');
@@ -970,10 +981,10 @@ function WordQuest({ words, onExit }) {
   if (!current && completed === 0) {
     return (
       <EmptyState
-        message={isDe ? 'Du brauchst mindestens ein gespeichertes Wort mit Bedeutung für Word Quest.' : 'Save at least one word with a meaning for Word Quest.'}
-        onExit={onExit}
-      />
-    );
+        message={localize('Save at least one word with a meaning for Word Quest.')}
+        onExit={onExit} />);
+
+
   }
 
   const checkAnswer = () => {
@@ -1008,38 +1019,38 @@ function WordQuest({ words, onExit }) {
     setHint(false);
   };
 
-  const displayedWord = current.artikel
-    ? `${current.artikel} ${current.wort}`
-    : current.wort;
+  const displayedWord = current.artikel ?
+  `${current.artikel} ${current.wort}` :
+  current.wort;
 
   return (
     <View style={styles.gameArea}>
       <View style={styles.scoreRow}>
         <Pressable onPress={onExit} hitSlop={8} style={styles.exitButton}>
           <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-          <Text style={styles.exitText}>{isDe ? 'Spiele' : 'Games'}</Text>
+          <Text style={styles.exitText}>{localize('Games')}</Text>
         </Pressable>
         <View style={styles.questStats}>
-          <Text style={styles.questStat}>🔥 {streak}</Text>
-          <Text style={styles.questStat}>⚡ {xp} XP</Text>
+          <Text style={styles.questStat}>{localize("\uD83D\uDD25")}{streak}</Text>
+          <Text style={styles.questStat}>{localize("\u26A1")}{xp}{localize("XP")}</Text>
         </View>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.gameBody}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.questionLabel}>{isDe ? 'Runde' : 'Round'} {completed + mistakes + 1} · {isDe ? 'Endlosmodus' : 'Endless mode'}</Text>
+        keyboardShouldPersistTaps="handled">
+
+        <Text style={styles.questionLabel}>{localize('Round')} {completed + mistakes + 1}{localize("\xB7")}{localize('Endless mode')}</Text>
         <View style={styles.questPromptCard}>
-          <Text style={styles.questPromptLabel}>{isDe ? 'Wie heißt dieses Wort auf Deutsch?' : 'What is this word in German?'}</Text>
+          <Text style={styles.questPromptLabel}>{localize('What is this word in German?')}</Text>
           <Text style={styles.questMeaning}>{current.bedeutung}</Text>
-          {hint ? (
-            <Text style={styles.questHint}>
-              Hinweis: {targetWithoutArticle.charAt(0).toLocaleUpperCase('de-DE')}
+          {hint ?
+          <Text style={styles.questHint}>{localize("Hinweis:")}
+            {targetWithoutArticle.charAt(0).toLocaleUpperCase('de-DE')}
               {' •'.repeat(Math.max(targetWithoutArticle.length - 1, 0))}
               {current.artikel ? ` · Artikel: ${current.artikel}` : ''}
-            </Text>
-          ) : null}
+            </Text> :
+          null}
         </View>
 
         <TextInput
@@ -1049,64 +1060,66 @@ function WordQuest({ words, onExit }) {
           editable={!result}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder={isDe ? 'Deine Antwort …' : 'Your answer…'}
+          placeholder={localize('Your answer…')}
           placeholderTextColor={colors.textMuted}
-          accessibilityLabel={isDe ? 'Deine Antwort' : 'Your answer'}
+          accessibilityLabel={localize('Your answer')}
           style={[
-            styles.questInput,
-            result === 'correct' && styles.questInputCorrect,
-            result === 'wrong' && styles.questInputWrong,
-          ]}
-        />
+          styles.questInput,
+          result === 'correct' && styles.questInputCorrect,
+          result === 'wrong' && styles.questInputWrong]
+          } />
 
-        {result ? (
-          <View
-            style={[
-              styles.questFeedback,
-              { backgroundColor: result === 'correct' ? GOOD.bg : BAD.bg },
-            ]}
-          >
+
+        {result ?
+        <View
+          style={[
+          styles.questFeedback,
+          { backgroundColor: result === 'correct' ? GOOD.bg : BAD.bg }]
+          }>
+
             <Ionicons
-              name={result === 'correct' ? 'checkmark-circle' : 'refresh-circle'}
-              size={22}
-              color={result === 'correct' ? GOOD.text : BAD.text}
-            />
+            name={result === 'correct' ? 'checkmark-circle' : 'refresh-circle'}
+            size={22}
+            color={result === 'correct' ? GOOD.text : BAD.text} />
+
             <Text
-              style={[
-                styles.questFeedbackText,
-                { color: result === 'correct' ? GOOD.text : BAD.text },
-              ]}
-            >
-              {result === 'correct'
-                ? `Richtig! +${(hint ? 5 : 10) + Math.min(streak * 2, 10)} XP`
-                : `Fast! Richtig ist „${displayedWord}“. Das Wort kommt gleich noch einmal.`}
+            style={[
+            styles.questFeedbackText,
+            { color: result === 'correct' ? GOOD.text : BAD.text }]
+            }>
+
+              {result === 'correct' ?
+            `Richtig! +${(hint ? 5 : 10) + Math.min(streak * 2, 10)} XP` :
+            `Fast! Richtig ist „${displayedWord}“. Das Wort kommt gleich noch einmal.`}
             </Text>
-          </View>
-        ) : (
-          <Pressable style={styles.questHintButton} onPress={() => setHint(true)}>
+          </View> :
+
+        <Pressable style={styles.questHintButton} onPress={() => setHint(true)}>
             <Ionicons name="bulb-outline" size={18} color={colors.textMuted} />
             <Text style={styles.questHintButtonText}>
               {hint ? 'Hinweis eingeblendet' : 'Hinweis (-5 XP)'}
             </Text>
           </Pressable>
-        )}
+        }
 
         <Pressable
           style={[styles.nextButton, !answer.trim() && !result && styles.buttonDisabled]}
           onPress={result ? nextWord : checkAnswer}
-          disabled={!answer.trim() && !result}
-        >
-          <Text style={styles.nextButtonText}>{result ? (isDe ? 'Weiter' : 'Next') : (isDe ? 'Antwort prüfen' : 'Check answer')}</Text>
+          disabled={!answer.trim() && !result}>
+
+          <Text style={styles.nextButtonText}>{result ? localize('Next') : localize('Check answer')}</Text>
         </Pressable>
       </ScrollView>
-    </View>
-  );
+    </View>);
+
 }
 
 export default function GamesView({ words }) {
   const { colors } = useTheme();
   const { language } = useLanguage();
   const isDe = language === 'de';
+  const { activeProfile } = useLanguageProfile();
+  const profileArticles = languageByCode(activeProfile?.language)?.articles || [];
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [game, setGame] = useState(null);
 
@@ -1124,11 +1137,11 @@ export default function GamesView({ words }) {
         </View>
         <View style={styles.menuTextWrap}>
           <View style={styles.questTitleRow}>
-            <Text style={styles.menuTitle}>Word Quest</Text>
-            <Text style={styles.newBadge}>{isDe ? 'NEU' : 'NEW'}</Text>
+            <Text style={styles.menuTitle}>{localize("Word Quest")}</Text>
+            <Text style={styles.newBadge}>{localize('NEW')}</Text>
           </View>
           <Text style={styles.menuSubtitle}>
-            {isDe ? 'Erinnere dich aktiv, sammle XP und wiederhole schwierige Wörter.' : 'Recall words, earn XP and revisit difficult vocabulary.'}
+            {localize('Recall words, earn XP and revisit difficult vocabulary.')}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
@@ -1139,31 +1152,35 @@ export default function GamesView({ words }) {
           <Ionicons name="bulb" size={26} color={colors.das.text} />
         </View>
         <View style={styles.menuTextWrap}>
-          <Text style={styles.menuTitle}>{isDe ? 'Bedeutung raten' : 'Guess the meaning'}</Text>
-          <Text style={styles.menuSubtitle}>{isDe ? 'Wähle die richtige Bedeutung des Wortes.' : 'Choose the correct meaning of the word.'}</Text>
+          <Text style={styles.menuTitle}>{localize('Guess the meaning')}</Text>
+          <Text style={styles.menuSubtitle}>{localize('Choose the correct meaning of the word.')}</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
       </Pressable>
 
-      <Pressable style={styles.menuCard} onPress={() => setGame('artikel')}>
+      {profileArticles.length ? <Pressable style={styles.menuCard} onPress={() => setGame('artikel')}>
         <View style={[styles.menuIcon, { backgroundColor: colors.der.bg }]}>
           <Ionicons name="text" size={26} color={colors.der.text} />
         </View>
         <View style={styles.menuTextWrap}>
-          <Text style={styles.menuTitle}>{isDe ? 'Artikel raten' : 'Guess the article'}</Text>
-          <Text style={styles.menuSubtitle}>{isDe ? 'der, die oder das? Rate den Artikel des Substantivs.' : 'Der, die or das? Choose the noun’s article.'}</Text>
+          <Text style={styles.menuTitle}>{localize('Guess the article')}</Text>
+          <Text style={styles.menuSubtitle}>
+            {profileArticles.length ?
+            `${profileArticles.join(', ')}? ${localize('Choose the correct article.')}` : localize(
+              'This language does not use articles.')}
+          </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-      </Pressable>
+      </Pressable> : null}
 
       <Pressable style={styles.menuCard} onPress={() => setGame('flashcards')}>
         <View style={[styles.menuIcon, { backgroundColor: colors.misc.bg }]}>
           <Ionicons name="albums" size={26} color={colors.misc.text} />
         </View>
         <View style={styles.menuTextWrap}>
-          <Text style={styles.menuTitle}>{isDe ? 'Lernkarten' : 'Flashcards'}</Text>
+          <Text style={styles.menuTitle}>{localize('Flashcards')}</Text>
           <Text style={styles.menuSubtitle}>
-            {isDe ? 'Ziehe zufällige Karten mit Wort, Bedeutung und Notizen.' : 'Review random cards with words, meanings and notes.'}
+            {localize('Review random cards with words, meanings and notes.')}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
@@ -1174,22 +1191,22 @@ export default function GamesView({ words }) {
           <Ionicons name="book" size={26} color={colors.die.text} />
         </View>
         <View style={styles.menuTextWrap}>
-          <Text style={styles.menuTitle}>{isDe ? 'Meine Geschichte' : 'My story'}</Text>
+          <Text style={styles.menuTitle}>{localize('My story')}</Text>
           <Text style={styles.menuSubtitle}>
-            {isDe ? 'KI schreibt eine Geschichte mit all deinen gespeicherten Wörtern.' : 'AI writes a story using your saved vocabulary.'}
+            {localize('AI writes a story using your saved vocabulary.')}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
       </Pressable>
-    </ScrollView>
-  );
+    </ScrollView>);
+
 }
 
 const makeStyles = (colors) => StyleSheet.create({
   menu: {
     paddingTop: 8,
     paddingBottom: 24,
-    gap: 14,
+    gap: 14
   },
   menuCard: {
     flexDirection: 'row',
@@ -1199,11 +1216,11 @@ const makeStyles = (colors) => StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 14,
     padding: 16,
-    gap: 14,
+    gap: 14
   },
   questMenuCard: {
     borderColor: '#d6a72c',
-    borderWidth: 1.5,
+    borderWidth: 1.5
   },
   questMenuIcon: {
     width: 48,
@@ -1211,12 +1228,12 @@ const makeStyles = (colors) => StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffe9a8',
+    backgroundColor: '#ffe9a8'
   },
   questTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 8
   },
   newBadge: {
     borderRadius: 999,
@@ -1226,75 +1243,75 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
     fontSize: 9,
-    fontWeight: '900',
+    fontWeight: '900'
   },
   menuIcon: {
     width: 48,
     height: 48,
     borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   menuTextWrap: {
-    flex: 1,
+    flex: 1
   },
   menuTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: colors.textDark,
+    color: colors.textDark
   },
   menuSubtitle: {
     marginTop: 3,
     fontSize: 13,
-    color: colors.textMuted,
+    color: colors.textMuted
   },
   gameArea: {
-    flex: 1,
+    flex: 1
   },
   gameBody: {
     paddingTop: 8,
-    paddingBottom: 30,
+    paddingBottom: 30
   },
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 8,
+    paddingBottom: 8
   },
   exitButton: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   exitText: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.textDark,
+    color: colors.textDark
   },
   scoreText: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.textMuted,
+    color: colors.textMuted
   },
   questStats: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 12
   },
   questStat: {
     fontSize: 14,
     fontWeight: '800',
-    color: colors.textDark,
+    color: colors.textDark
   },
   questProgressTrack: {
     height: 8,
     borderRadius: 999,
     overflow: 'hidden',
     backgroundColor: colors.border,
-    marginBottom: 18,
+    marginBottom: 18
   },
   questProgressFill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: '#d6a72c',
+    backgroundColor: '#d6a72c'
   },
   questPromptCard: {
     backgroundColor: colors.headerBg,
@@ -1302,27 +1319,27 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingVertical: 28,
     paddingHorizontal: 20,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 16
   },
   questPromptLabel: {
     color: '#cfc9bd',
     fontSize: 13,
     fontWeight: '700',
-    marginBottom: 12,
+    marginBottom: 12
   },
   questMeaning: {
     color: '#fff',
     fontSize: 25,
     lineHeight: 32,
     fontWeight: '900',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   questHint: {
     marginTop: 16,
     color: '#ffe9a8',
     fontSize: 13,
     fontWeight: '700',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   questInput: {
     minHeight: 56,
@@ -1333,25 +1350,25 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textDark,
     paddingHorizontal: 16,
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   questInputCorrect: {
-    borderColor: GOOD.border,
+    borderColor: GOOD.border
   },
   questInputWrong: {
-    borderColor: BAD.border,
+    borderColor: BAD.border
   },
   questHintButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
-    paddingVertical: 13,
+    paddingVertical: 13
   },
   questHintButtonText: {
     color: colors.textMuted,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   questFeedback: {
     flexDirection: 'row',
@@ -1359,22 +1376,22 @@ const makeStyles = (colors) => StyleSheet.create({
     gap: 10,
     borderRadius: 12,
     padding: 13,
-    marginTop: 12,
+    marginTop: 12
   },
   questFeedbackText: {
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   buttonDisabled: {
-    opacity: 0.45,
+    opacity: 0.45
   },
   questComplete: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 40,
+    paddingBottom: 40
   },
   questTrophy: {
     width: 82,
@@ -1383,12 +1400,12 @@ const makeStyles = (colors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffe9a8',
-    marginBottom: 18,
+    marginBottom: 18
   },
   questCompleteTitle: {
     color: colors.textDark,
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '900'
   },
   questCompleteSubtitle: {
     color: colors.textMuted,
@@ -1396,12 +1413,12 @@ const makeStyles = (colors) => StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     marginTop: 8,
-    maxWidth: 320,
+    maxWidth: 320
   },
   questSummaryRow: {
     flexDirection: 'row',
     gap: 12,
-    marginVertical: 24,
+    marginVertical: 24
   },
   questSummaryCard: {
     minWidth: 120,
@@ -1410,18 +1427,18 @@ const makeStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.cardBg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
+    padding: 14
   },
   questSummaryValue: {
     color: colors.textDark,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '900'
   },
   questSummaryLabel: {
     color: colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: 4
   },
   questionLabel: {
     fontSize: 13,
@@ -1429,7 +1446,7 @@ const makeStyles = (colors) => StyleSheet.create({
     letterSpacing: 0.5,
     color: colors.textMuted,
     textTransform: 'uppercase',
-    marginBottom: 10,
+    marginBottom: 10
   },
   promptCard: {
     backgroundColor: colors.headerBg,
@@ -1437,23 +1454,23 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingVertical: 28,
     paddingHorizontal: 20,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 20
   },
   promptWord: {
     fontSize: 28,
     fontWeight: '900',
     color: '#fff',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   promptMeaning: {
     marginTop: 8,
     fontSize: 15,
     color: '#cfc9bd',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   flashcardBody: {
     paddingTop: 8,
-    paddingBottom: 30,
+    paddingBottom: 30
   },
   flashcard: {
     minHeight: 320,
@@ -1467,29 +1484,29 @@ const makeStyles = (colors) => StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.12,
     shadowRadius: 10,
-    elevation: 5,
+    elevation: 5
   },
   flashcardBadge: {
     borderRadius: 999,
     paddingHorizontal: 13,
     paddingVertical: 6,
-    marginBottom: 14,
+    marginBottom: 14
   },
   flashcardBadgeText: {
     fontSize: 13,
     fontWeight: '800',
-    textTransform: 'uppercase',
+    textTransform: 'uppercase'
   },
   flashcardWord: {
     fontSize: 30,
     fontWeight: '900',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   flashcardDivider: {
     width: 64,
     height: 1,
     backgroundColor: colors.border,
-    marginVertical: 22,
+    marginVertical: 22
   },
   flashcardLabel: {
     marginTop: 4,
@@ -1497,20 +1514,20 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0.8
   },
   flashcardMeaning: {
     marginBottom: 18,
     color: colors.textDark,
     fontSize: 21,
     fontWeight: '700',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   flashcardNotes: {
     color: colors.textDark,
     fontSize: 15,
     lineHeight: 22,
-    textAlign: 'center',
+    textAlign: 'center'
   },
   flashcardNextButton: {
     flexDirection: 'row',
@@ -1523,30 +1540,30 @@ const makeStyles = (colors) => StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.misc.text,
     borderRadius: 10,
-    backgroundColor: colors.misc.bg,
+    backgroundColor: colors.misc.bg
   },
   flashcardNextText: {
     color: colors.misc.text,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   storyBody: {
     paddingTop: 8,
-    paddingBottom: 150,
+    paddingBottom: 150
   },
   storyLevelScreen: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
-    paddingBottom: 52,
+    paddingBottom: 52
   },
   storyLevelTitle: {
     marginTop: 12,
     color: colors.textDark,
     fontSize: 24,
     fontWeight: '800',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   storyLevelIntro: {
     maxWidth: 440,
@@ -1554,13 +1571,13 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.textMuted,
     fontSize: 15,
     lineHeight: 22,
-    textAlign: 'center',
+    textAlign: 'center'
   },
   storyLevelOptions: {
     width: '100%',
     maxWidth: 520,
     gap: 11,
-    marginTop: 26,
+    marginTop: 26
   },
   storyLevelOption: {
     flexDirection: 'row',
@@ -1570,10 +1587,10 @@ const makeStyles = (colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 13,
-    backgroundColor: colors.cardBg,
+    backgroundColor: colors.cardBg
   },
   storyLevelOptionPressed: {
-    opacity: 0.72,
+    opacity: 0.72
   },
   storyLevelBadge: {
     width: 45,
@@ -1581,36 +1598,36 @@ const makeStyles = (colors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 23,
-    backgroundColor: colors.misc.bg,
+    backgroundColor: colors.misc.bg
   },
   storyLevelBadgeText: {
     color: colors.misc.text,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '900'
   },
   storyLevelCopy: {
-    flex: 1,
+    flex: 1
   },
   storyLevelOptionTitle: {
     color: colors.textDark,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   storyLevelDescription: {
     marginTop: 3,
     color: colors.textMuted,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 18
   },
   storyResetButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 5
   },
   storyResetText: {
     color: colors.misc.text,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   storyProgressLink: {
     alignSelf: 'flex-start',
@@ -1618,24 +1635,24 @@ const makeStyles = (colors) => StyleSheet.create({
     alignItems: 'center',
     gap: 7,
     marginBottom: 12,
-    paddingVertical: 7,
+    paddingVertical: 7
   },
   storyProgressLinkText: {
     color: colors.misc.text,
     fontSize: 13,
     fontWeight: '800',
-    textDecorationLine: 'underline',
+    textDecorationLine: 'underline'
   },
   storyLoading: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
+    gap: 14
   },
   storyLoadingText: {
     color: colors.textMuted,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   storyError: {
     padding: 14,
@@ -1643,12 +1660,12 @@ const makeStyles = (colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.die.text,
     borderRadius: 10,
-    backgroundColor: colors.die.bg,
+    backgroundColor: colors.die.bg
   },
   storyErrorText: {
     color: colors.die.text,
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 20
   },
   storyPaper: {
     paddingHorizontal: 22,
@@ -1661,14 +1678,14 @@ const makeStyles = (colors) => StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 9,
-    elevation: 4,
+    elevation: 4
   },
   storyTitle: {
     color: colors.textDark,
     fontFamily: 'Georgia',
     fontSize: 27,
     fontWeight: '700',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   storyTitleRule: {
     alignSelf: 'center',
@@ -1676,35 +1693,35 @@ const makeStyles = (colors) => StyleSheet.create({
     height: 2,
     marginTop: 14,
     marginBottom: 22,
-    backgroundColor: colors.misc.text,
+    backgroundColor: colors.misc.text
   },
   storyParagraphWrap: {
-    marginBottom: 18,
+    marginBottom: 18
   },
   storyParagraph: {
     color: colors.textDark,
     fontSize: 17,
-    lineHeight: 28,
+    lineHeight: 28
   },
   storyClickableWord: {
-    color: colors.textDark,
+    color: colors.textDark
   },
   storyInteractiveWord: {
     color: colors.misc.text,
     fontWeight: '800',
     textDecorationLine: 'underline',
-    textDecorationStyle: 'solid',
+    textDecorationStyle: 'solid'
   },
   storyTranslatableSentence: {
     textDecorationLine: 'underline',
     textDecorationStyle: 'dotted',
-    textDecorationColor: colors.misc.text,
+    textDecorationColor: colors.misc.text
   },
   storySelectedText: {
     color: colors.textDark,
     backgroundColor: colors.misc.bg,
     fontWeight: '800',
-    textDecorationLine: 'none',
+    textDecorationLine: 'none'
   },
   storyTranslateToggle: {
     alignSelf: 'flex-end',
@@ -1713,7 +1730,7 @@ const makeStyles = (colors) => StyleSheet.create({
     gap: 10,
     marginBottom: 10,
     paddingVertical: 7,
-    paddingLeft: 4,
+    paddingLeft: 4
   },
   storyStickyControls: {
     zIndex: 2,
@@ -1721,18 +1738,18 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingBottom: 2,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.pageBg,
+    backgroundColor: colors.pageBg
   },
   storyTranslateToggleActive: {
-    opacity: 1,
+    opacity: 1
   },
   storyTranslateToggleText: {
     color: colors.textMuted,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   storyTranslateToggleTextActive: {
-    color: colors.misc.text,
+    color: colors.misc.text
   },
   storyTranslateSwitchTrack: {
     width: 44,
@@ -1740,10 +1757,10 @@ const makeStyles = (colors) => StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderRadius: 13,
-    backgroundColor: colors.border,
+    backgroundColor: colors.border
   },
   storyTranslateSwitchTrackActive: {
-    backgroundColor: colors.misc.text,
+    backgroundColor: colors.misc.text
   },
   storyTranslateSwitchThumb: {
     width: 20,
@@ -1754,17 +1771,17 @@ const makeStyles = (colors) => StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 2
   },
   storyTranslateSwitchThumbActive: {
-    alignSelf: 'flex-end',
+    alignSelf: 'flex-end'
   },
   storyTranslateHint: {
     marginTop: -2,
     marginBottom: 12,
     color: colors.textMuted,
     fontSize: 13,
-    textAlign: 'right',
+    textAlign: 'right'
   },
   storyGenerateButton: {
     flexDirection: 'row',
@@ -1776,15 +1793,15 @@ const makeStyles = (colors) => StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.misc.text,
     borderRadius: 10,
-    backgroundColor: colors.misc.bg,
+    backgroundColor: colors.misc.bg
   },
   storyGenerateButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   storyGenerateText: {
     color: colors.misc.text,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   storySessionComplete: {
     flexDirection: 'row',
@@ -1794,21 +1811,21 @@ const makeStyles = (colors) => StyleSheet.create({
     marginTop: 18,
     padding: 14,
     borderRadius: 10,
-    backgroundColor: GOOD.bg,
+    backgroundColor: GOOD.bg
   },
   storySessionCompleteText: {
     flex: 1,
     color: GOOD.text,
     fontSize: 14,
     fontWeight: '800',
-    textAlign: 'center',
+    textAlign: 'center'
   },
   storyModalBackdrop: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.48)',
+    backgroundColor: 'rgba(0, 0, 0, 0.78)'
   },
   storyModalCard: {
     width: '100%',
@@ -1818,27 +1835,27 @@ const makeStyles = (colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 16,
-    backgroundColor: colors.cardBg,
+    backgroundColor: colors.cardBg
   },
   storyModalTitle: {
     color: colors.textDark,
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   storyModalScroll: {
-    marginTop: 8,
+    marginTop: 8
   },
   storyModalSection: {
     marginTop: 16,
     marginBottom: 7,
     color: colors.textDark,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   storyModalWords: {
     color: colors.textMuted,
     fontSize: 15,
-    lineHeight: 24,
+    lineHeight: 24
   },
   wordMeaningOverlay: {
     position: 'absolute',
@@ -1855,64 +1872,64 @@ const makeStyles = (colors) => StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.22,
-    shadowRadius: 10,
+    shadowRadius: 10
   },
   wordMeaningHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
   wordMeaningActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 12
   },
   wordMeaningTitle: {
     color: colors.misc.text,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '900'
   },
   wordMeaningText: {
     marginTop: 4,
     color: colors.textDark,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   wordMeaningNotes: {
     marginTop: 8,
     color: colors.textMuted,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 18
   },
   translationOverlayLabel: {
     color: colors.misc.text,
     fontSize: 13,
     fontWeight: '900',
-    letterSpacing: 0.7,
+    letterSpacing: 0.7
   },
   translationSource: {
     marginTop: 7,
     color: colors.textMuted,
     fontSize: 13,
     fontStyle: 'italic',
-    lineHeight: 18,
+    lineHeight: 18
   },
   translationLoading: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 10,
+    marginTop: 10
   },
   translationLoadingText: {
     color: colors.textMuted,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   translationError: {
     marginTop: 6,
     color: colors.die.text,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   option: {
     flexDirection: 'row',
@@ -1922,73 +1939,73 @@ const makeStyles = (colors) => StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 15,
     paddingHorizontal: 16,
-    marginBottom: 10,
+    marginBottom: 10
   },
   optionNeutral: {
     backgroundColor: colors.cardBg,
-    borderColor: colors.border,
+    borderColor: colors.border
   },
   optionText: {
     fontSize: 16,
     color: colors.textDark,
-    flex: 1,
+    flex: 1
   },
   artikelRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 18
   },
   artikelButton: {
     flex: 1,
     borderWidth: 2,
     borderRadius: 12,
     paddingVertical: 22,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   artikelButtonText: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '900'
   },
   feedbackText: {
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 16
   },
   nextButton: {
     backgroundColor: colors.headerBg,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 4
   },
   nextButtonText: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   emptyWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 24
   },
   emptyText: {
     textAlign: 'center',
     color: colors.textMuted,
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: 20,
+    marginBottom: 20
   },
   emptyButton: {
     backgroundColor: colors.headerBg,
     borderRadius: 10,
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 20
   },
   emptyButtonText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '700',
-  },
+    fontWeight: '700'
+  }
 });

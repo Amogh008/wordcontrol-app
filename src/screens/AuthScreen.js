@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { localize } from "../locales";import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
-  View,
-} from 'react-native';
+  View } from
+'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { isGoogleConfigured, useGoogleIdTokenRequest } from '../services/googleAuth';
 import OutlinedButton from '../components/OutlinedButton';
+import { useAppDialog } from '../context/AppDialogContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -22,6 +22,7 @@ const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: '
 
 export default function AuthScreen() {
   const { colors } = useTheme();
+  const dialog = useAppDialog();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { login, register, verifyEmail, forgotPassword, resetPassword, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState('login');
@@ -41,13 +42,13 @@ export default function AuthScreen() {
   useEffect(() => {
     if (response?.type === 'success' && response.params?.id_token) {
       setGoogleSubmitting(true);
-      loginWithGoogle(response.params.id_token)
-        .catch((err) => {
-          setFormError(
-            err.response?.data?.error || err.message || 'Google sign-in failed.',
-          );
-        })
-        .finally(() => setGoogleSubmitting(false));
+      loginWithGoogle(response.params.id_token).
+      catch((err) => {
+        setFormError(
+          err.response?.data?.error || err.message || 'Google sign-in failed.'
+        );
+      }).
+      finally(() => setGoogleSubmitting(false));
     }
   }, [response, loginWithGoogle]);
 
@@ -68,7 +69,7 @@ export default function AuthScreen() {
         setMode('reset');
       } catch (err) {
         setFormError(
-          err.response?.data?.error || err.message || 'The reset code could not be sent.',
+          err.response?.data?.error || err.message || 'The reset code could not be sent.'
         );
       } finally {
         setSubmitting(false);
@@ -95,16 +96,16 @@ export default function AuthScreen() {
         await resetPassword({
           email: verificationEmail,
           code: verificationCode.trim(),
-          password,
+          password
         });
-        Alert.alert('Password updated', 'You can now log in with your new password.');
+        dialog.alert(localize('Password updated'), localize('You can now log in with your new password.'));
         setPassword('');
         setConfirmPassword('');
         setVerificationCode('');
         setMode('login');
       } catch (err) {
         setFormError(
-          err.response?.data?.error || err.message || 'Password reset failed.',
+          err.response?.data?.error || err.message || 'Password reset failed.'
         );
       } finally {
         setSubmitting(false);
@@ -122,11 +123,11 @@ export default function AuthScreen() {
       try {
         await verifyEmail({
           email: verificationEmail,
-          code: verificationCode.trim(),
+          code: verificationCode.trim()
         });
       } catch (err) {
         setFormError(
-          err.response?.data?.error || err.message || 'Email verification failed.',
+          err.response?.data?.error || err.message || 'Email verification failed.'
         );
       } finally {
         setSubmitting(false);
@@ -151,7 +152,7 @@ export default function AuthScreen() {
       }
     } catch (err) {
       setFormError(
-        err.response?.data?.error || err.message || 'Something went wrong. Please try again.',
+        err.response?.data?.error || err.message || 'Something went wrong. Please try again.'
       );
     } finally {
       setSubmitting(false);
@@ -163,10 +164,10 @@ export default function AuthScreen() {
     setResending(true);
     try {
       await register({ email: email.trim(), password, name: name.trim() });
-      Alert.alert('Code sent', `A new verification code was sent to ${verificationEmail}.`);
+      dialog.alert(localize('Code sent'), `A new verification code was sent to ${verificationEmail}.`);
     } catch (err) {
       setFormError(
-        err.response?.data?.error || err.message || 'The code could not be resent.',
+        err.response?.data?.error || err.message || 'The code could not be resent.'
       );
     } finally {
       setResending(false);
@@ -178,10 +179,10 @@ export default function AuthScreen() {
     setResending(true);
     try {
       await forgotPassword(verificationEmail);
-      Alert.alert('Code sent', `A new password reset code was sent to ${verificationEmail}.`);
+      dialog.alert(localize('Code sent'), `A new password reset code was sent to ${verificationEmail}.`);
     } catch (err) {
       setFormError(
-        err.response?.data?.error || err.message || 'The reset code could not be resent.',
+        err.response?.data?.error || err.message || 'The reset code could not be resent.'
       );
     } finally {
       setResending(false);
@@ -191,194 +192,194 @@ export default function AuthScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <View style={styles.content}>
-        <Text style={styles.title}>DLT</Text>
-        <Text style={styles.brandName}>Deutsche Learn Tool</Text>
+        <Text style={styles.title}>{localize("DLT")}</Text>
+        <Text style={styles.brandName}>{localize("Deutsche Learn Tool")}</Text>
         <Text style={styles.subtitle}>
-          {mode === 'login'
-            ? 'Log in to your account'
-            : mode === 'register'
-              ? 'Create an account'
-              : mode === 'forgot'
-                ? 'Enter your account email to receive a reset code'
-                : mode === 'reset'
-                  ? `Enter the reset code sent to ${verificationEmail}`
-                  : `Enter the code sent to ${verificationEmail}`}
+          {mode === 'login' ?
+          'Log in to your account' :
+          mode === 'register' ?
+          'Create an account' :
+          mode === 'forgot' ?
+          'Enter your account email to receive a reset code' :
+          mode === 'reset' ?
+          `Enter the reset code sent to ${verificationEmail}` :
+          `Enter the code sent to ${verificationEmail}`}
         </Text>
 
-        {mode === 'register' ? (
-          <TextInput
-            style={styles.input}
-            placeholder="Name"
-            placeholderTextColor={colors.placeholder}
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-          />
-        ) : null}
-        {mode === 'verify' ? (
-          <TextInput
+        {mode === 'register' ?
+        <TextInput
+          style={styles.input}
+          placeholder={localize("Name")}
+          placeholderTextColor={colors.placeholder}
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words" /> :
+
+        null}
+        {mode === 'verify' ?
+        <TextInput
+          style={[styles.input, styles.codeInput]}
+          placeholder={localize("000000")}
+          placeholderTextColor={colors.placeholder}
+          value={verificationCode}
+          onChangeText={(value) => setVerificationCode(value.replace(/\D/g, '').slice(0, 6))}
+          keyboardType="number-pad"
+          autoComplete="one-time-code"
+          maxLength={6} /> :
+
+        mode === 'reset' ?
+        <>
+            <TextInput
             style={[styles.input, styles.codeInput]}
-            placeholder="000000"
+            placeholder={localize("000000")}
             placeholderTextColor={colors.placeholder}
             value={verificationCode}
             onChangeText={(value) => setVerificationCode(value.replace(/\D/g, '').slice(0, 6))}
             keyboardType="number-pad"
             autoComplete="one-time-code"
-            maxLength={6}
-          />
-        ) : mode === 'reset' ? (
-          <>
-            <TextInput
-              style={[styles.input, styles.codeInput]}
-              placeholder="000000"
-              placeholderTextColor={colors.placeholder}
-              value={verificationCode}
-              onChangeText={(value) => setVerificationCode(value.replace(/\D/g, '').slice(0, 6))}
-              keyboardType="number-pad"
-              autoComplete="one-time-code"
-              maxLength={6}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="New password (minimum 8 characters)"
-              placeholderTextColor={colors.placeholder}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm new password"
-              placeholderTextColor={colors.placeholder}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-          </>
-        ) : (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor={colors.placeholder}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-            />
-            {mode !== 'forgot' ? (
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor={colors.placeholder}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-              />
-            ) : null}
-          </>
-        )}
+            maxLength={6} />
 
-        {formError ? (
-          <View style={styles.errorBox} accessibilityRole="alert">
+            <TextInput
+            style={styles.input}
+            placeholder={localize("New password (minimum 8 characters)")}
+            placeholderTextColor={colors.placeholder}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none" />
+
+            <TextInput
+            style={styles.input}
+            placeholder={localize("Confirm new password")}
+            placeholderTextColor={colors.placeholder}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            autoCapitalize="none" />
+
+          </> :
+
+        <>
+            <TextInput
+            style={styles.input}
+            placeholder={localize("Email")}
+            placeholderTextColor={colors.placeholder}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address" />
+
+            {mode !== 'forgot' ?
+          <TextInput
+            style={styles.input}
+            placeholder={localize("Password")}
+            placeholderTextColor={colors.placeholder}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none" /> :
+
+          null}
+          </>
+        }
+
+        {formError ?
+        <View style={styles.errorBox} accessibilityRole="alert">
             <Text style={styles.errorText}>{formError}</Text>
-          </View>
-        ) : null}
+          </View> :
+        null}
 
         <OutlinedButton
-          title={mode === 'login'
-            ? 'Log In'
-            : mode === 'register'
-              ? 'Send Code'
-              : mode === 'forgot'
-                ? 'Send Reset Code'
-                : mode === 'reset'
-                  ? 'Set New Password'
-                  : 'Verify Email'}
-          icon={mode === 'login'
-            ? 'login'
-            : mode === 'reset'
-              ? 'key-outline'
-              : mode === 'verify'
-                ? 'checkmark-circle-outline'
-                : 'mail-outline'}
+          title={mode === 'login' ?
+          'Log In' :
+          mode === 'register' ?
+          'Send Code' :
+          mode === 'forgot' ?
+          'Send Reset Code' :
+          mode === 'reset' ?
+          'Set New Password' :
+          'Verify Email'}
+          icon={mode === 'login' ?
+          'login' :
+          mode === 'reset' ?
+          'key-outline' :
+          mode === 'verify' ?
+          'checkmark-circle-outline' :
+          'mail-outline'}
           onPress={submit}
           disabled={submitting}
           loading={submitting}
-          style={styles.primaryButton}
-        />
+          style={styles.primaryButton} />
 
-        {mode === 'login' ? (
-          <Pressable
-            onPress={() => {
-              setFormError('');
-              setMode('forgot');
-            }}
-          >
-            <Text style={styles.switchModeText}>Forgot password?</Text>
-          </Pressable>
-        ) : null}
-        {mode === 'reset' ? (
-          <Pressable
-            onPress={resendPasswordResetCode}
-            disabled={resending}
-            style={styles.resendButton}
-          >
+
+        {mode === 'login' ?
+        <Pressable
+          onPress={() => {
+            setFormError('');
+            setMode('forgot');
+          }}>
+
+            <Text style={styles.switchModeText}>{localize("Forgot password?")}</Text>
+          </Pressable> :
+        null}
+        {mode === 'reset' ?
+        <Pressable
+          onPress={resendPasswordResetCode}
+          disabled={resending}
+          style={styles.resendButton}>
+
             <Text style={styles.switchModeText}>
               {resending ? 'Sending a new code…' : 'Resend reset code'}
             </Text>
-          </Pressable>
-        ) : null}
+          </Pressable> :
+        null}
 
         <Pressable
           onPress={() => {
             setFormError('');
             setMode(mode === 'login' ? 'register' : 'login');
-          }}
-        >
+          }}>
+
           <Text style={styles.switchModeText}>
-            {mode === 'login'
-              ? "Don't have an account? Sign up"
-              : mode === 'register'
-                ? 'Already have an account? Log in'
-                : 'Back to login'}
+            {mode === 'login' ?
+            "Don't have an account? Sign up" :
+            mode === 'register' ?
+            'Already have an account? Log in' :
+            'Back to login'}
           </Text>
         </Pressable>
-        {mode === 'verify' ? (
-          <Pressable
-            onPress={resendVerificationCode}
-            disabled={resending}
-            style={styles.resendButton}
-          >
+        {mode === 'verify' ?
+        <Pressable
+          onPress={resendVerificationCode}
+          disabled={resending}
+          style={styles.resendButton}>
+
             <Text style={styles.switchModeText}>
               {resending ? 'Sending a new code…' : 'Resend verification code'}
             </Text>
-          </Pressable>
-        ) : null}
+          </Pressable> :
+        null}
 
-        {isGoogleConfigured && (mode === 'login' || mode === 'register') ? (
-          <>
+        {isGoogleConfigured && (mode === 'login' || mode === 'register') ?
+        <>
             <View style={styles.divider} />
             <Pressable
-              style={[styles.googleButton, (!request || googleSubmitting) && styles.disabledButton]}
-              onPress={() => promptAsync()}
-              disabled={!request || googleSubmitting}
-            >
-              {googleSubmitting ? (
-                <ActivityIndicator color={colors.textDark} />
-              ) : (
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
-              )}
+            style={[styles.googleButton, (!request || googleSubmitting) && styles.disabledButton]}
+            onPress={() => promptAsync()}
+            disabled={!request || googleSubmitting}>
+
+              {googleSubmitting ?
+            <ActivityIndicator color={colors.textDark} /> :
+
+            <Text style={styles.googleButtonText}>{localize("Continue with Google")}</Text>
+            }
             </Pressable>
-          </>
-        ) : null}
+          </> :
+        null}
       </View>
-    </SafeAreaView>
-  );
+    </SafeAreaView>);
+
 }
 
 const makeStyles = (colors) => StyleSheet.create({
@@ -389,7 +390,7 @@ const makeStyles = (colors) => StyleSheet.create({
     fontSize: 34,
     color: colors.textDark,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 4
   },
   brandName: {
     color: colors.misc.text,
@@ -398,13 +399,13 @@ const makeStyles = (colors) => StyleSheet.create({
     letterSpacing: 1.4,
     textAlign: 'center',
     textTransform: 'uppercase',
-    marginBottom: 8,
+    marginBottom: 8
   },
   subtitle: {
     fontSize: 15,
     color: colors.textMuted,
     textAlign: 'center',
-    marginBottom: 28,
+    marginBottom: 28
   },
   input: {
     backgroundColor: colors.cardBg,
@@ -415,13 +416,13 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: colors.textDark,
-    marginBottom: 12,
+    marginBottom: 12
   },
   codeInput: {
     textAlign: 'center',
     fontSize: 26,
     fontWeight: '700',
-    letterSpacing: 8,
+    letterSpacing: 8
   },
   errorBox: {
     marginBottom: 12,
@@ -430,32 +431,32 @@ const makeStyles = (colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: '#c0392b',
     borderRadius: 9,
-    backgroundColor: '#c0392b18',
+    backgroundColor: '#c0392b18'
   },
   errorText: {
     color: '#c0392b',
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
-    textAlign: 'center',
+    textAlign: 'center'
   },
   primaryButton: {
-    marginTop: 4,
+    marginTop: 4
   },
   disabledButton: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   switchModeText: {
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: 16,
-    fontSize: 14,
+    fontSize: 14
   },
   resendButton: { marginTop: 2 },
   divider: {
     height: 1,
     backgroundColor: colors.border,
-    marginVertical: 24,
+    marginVertical: 24
   },
   googleButton: {
     backgroundColor: colors.cardBg,
@@ -463,11 +464,11 @@ const makeStyles = (colors) => StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 10,
     paddingVertical: 14,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   googleButtonText: {
     color: colors.textDark,
     fontSize: 16,
-    fontWeight: '600',
-  },
+    fontWeight: '600'
+  }
 });

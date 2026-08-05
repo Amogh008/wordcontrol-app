@@ -1,5 +1,6 @@
 import { apiClient, API_BASE_URL } from './apiClient';
 import { getToken } from './tokenStore';
+import { getActiveLanguageProfileId } from './languageProfileStore';
 
 export async function getWords() {
   const { data } = await apiClient.get('/');
@@ -67,6 +68,8 @@ export function streamStory({ wordIds, level, onDelta }) {
     request.setRequestHeader('Content-Type', 'application/json');
     const token = getToken();
     if (token) request.setRequestHeader('Authorization', `Bearer ${token}`);
+    const profileId = getActiveLanguageProfileId();
+    if (profileId) request.setRequestHeader('X-Language-Profile-Id', profileId);
 
     request.onprogress = () => {
       try {

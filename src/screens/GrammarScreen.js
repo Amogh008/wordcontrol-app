@@ -1,30 +1,34 @@
-import { useMemo, useState } from 'react';
+import { localize, localizeFormat } from "../locales";import { useMemo, useState } from 'react';
 import {
-  Alert,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  View,
-} from 'react-native';
+  View } from
+'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { checkGrammar } from '../services/wordsService';
 import OutlinedButton from '../components/OutlinedButton';
+import { useLanguageProfile } from '../context/LanguageProfileContext';
+import { useAppDialog } from '../context/AppDialogContext';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
 const GOOD = { text: '#2f9e44', bg: '#d3f9d8', border: '#2f9e44' };
 const WARN = { text: '#c2255c', bg: '#ffdeeb', border: '#c2255c' };
 
-export default function GrammarScreen() {
+export default function GrammarScreen({ embedded = false }) {
   const { colors } = useTheme();
+  const dialog = useAppDialog();
   const { language } = useLanguage();
   const isDe = language === 'de';
+  const { activeProfile } = useLanguageProfile();
+  const targetName = localize(activeProfile?.englishName);
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [sentence, setSentence] = useState('');
   const [result, setResult] = useState(null);
@@ -38,8 +42,8 @@ export default function GrammarScreen() {
       const data = await checkGrammar({ sentence: sentence.trim() });
       setResult(data);
     } catch (err) {
-      const msg = err.response?.data?.error ?? err.message ?? (isDe ? 'Prüfung fehlgeschlagen.' : 'Grammar check failed.');
-      Alert.alert(isDe ? 'Fehler' : 'Error', msg);
+      const msg = err.response?.data?.error ?? err.message ?? localize('Grammar check failed.');
+      dialog.alert(localize('Error'), msg);
     } finally {
       setLoading(false);
     }
@@ -53,122 +57,126 @@ export default function GrammarScreen() {
     setResult(null);
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.header}>
+  const content =
+  <>
+      {!embedded ? <View style={styles.header}>
         <Text style={styles.title}>
-          <Text style={styles.titleBold}>{isDe ? 'Mein ' : 'My '}</Text>
-          <Text style={styles.titleItalic}>{isDe ? 'Grammatik-Check' : 'Grammar Check'}</Text>
+          <Text style={styles.titleBold}>{localize('My ')}</Text>
+          <Text style={styles.titleItalic}>{localize('Grammar Check')}</Text>
         </Text>
-        <Text style={styles.subtitle}>{isDe ? 'Ist dein Satz korrekt?' : 'Is your German sentence correct?'}</Text>
-      </View>
+        <Text style={styles.subtitle}>{localizeFormat("Is your {0} sentence correct?", [targetName || 'German'])}</Text>
+      </View> : null}
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>{isDe ? 'DEUTSCHER SATZ' : 'GERMAN SENTENCE'}</Text>
+        <Text style={styles.label}>{(targetName || 'German').toUpperCase()} {localize('SENTENCE')}</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="z.B. Ich habe gestern ins Kino gegangen."
-          placeholderTextColor={colors.placeholder}
-          value={sentence}
-          onChangeText={setSentence}
-          multiline
-        />
+        style={[styles.input, styles.textArea]}
+        placeholder={localize("z.B. Ich habe gestern ins Kino gegangen.")}
+        placeholderTextColor={colors.placeholder}
+        value={sentence}
+        onChangeText={setSentence}
+        multiline />
+
 
         <View style={styles.actionRow}>
           <OutlinedButton
-            title={loading ? (isDe ? 'KI prüft…' : 'AI is checking…') : (isDe ? 'Mit KI prüfen' : 'Check with AI')}
-            icon="fact-check"
-            tone="ai"
-            onPress={handleCheck}
-            disabled={!canCheck}
-            loading={loading}
-            style={styles.checkButton}
-          />
+          title={loading ? localize('AI is checking…') : localize('Check with AI')}
+          icon="fact-check"
+          tone="ai"
+          onPress={handleCheck}
+          disabled={!canCheck}
+          loading={loading}
+          style={styles.checkButton} />
+
 
           <Pressable style={styles.clearButton} onPress={reset}>
             <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
-            <Text style={styles.clearButtonText}>{isDe ? 'Alles löschen' : 'Clear all'}</Text>
+            <Text style={styles.clearButtonText}>{localize('Clear all')}</Text>
           </Pressable>
         </View>
 
-        {result ? (
-          <View>
+        {result ?
+      <View>
             <View
-              style={[
-                styles.statusBanner,
-                { backgroundColor: result.correct ? GOOD.bg : WARN.bg, borderColor: result.correct ? GOOD.border : WARN.border },
-              ]}
-            >
+          style={[
+          styles.statusBanner,
+          { backgroundColor: result.correct ? GOOD.bg : WARN.bg, borderColor: result.correct ? GOOD.border : WARN.border }]
+          }>
+
               <Ionicons
-                name={result.correct ? 'checkmark-circle' : 'alert-circle'}
-                size={22}
-                color={result.correct ? GOOD.text : WARN.text}
-              />
+            name={result.correct ? 'checkmark-circle' : 'alert-circle'}
+            size={22}
+            color={result.correct ? GOOD.text : WARN.text} />
+
               <Text style={[styles.statusText, { color: result.correct ? GOOD.text : WARN.text }]}>
-                {result.correct ? (isDe ? 'Richtig!' : 'Correct!') : (isDe ? 'Enthält Fehler' : 'Contains errors')}
+                {result.correct ? localize('Correct!') : localize('Contains errors')}
               </Text>
             </View>
 
-            {showCorrection ? (
-              <>
+            {showCorrection ?
+        <>
                 <Text style={styles.label}>
-                  {result.correct ? (isDe ? 'KORREKTER SATZ' : 'CORRECT SENTENCE') : (isDe ? 'KORRIGIERTER SATZ' : 'CORRECTED SENTENCE')}
+                  {result.correct ? localize('CORRECT SENTENCE') : localize('CORRECTED SENTENCE')}
                 </Text>
                 <View style={styles.correctionCard}>
                   <Text style={styles.correctionText}>{result.corrected}</Text>
                 </View>
-              </>
-            ) : null}
+              </> :
+        null}
 
-            {result.feedback ? (
-              <>
-                <Text style={styles.label}>{isDe ? 'ERKLÄRUNG' : 'EXPLANATION'}</Text>
+            {result.feedback ?
+        <>
+                <Text style={styles.label}>{localize('EXPLANATION')}</Text>
                 <View style={styles.feedbackCard}>
                   <Text style={styles.feedbackText}>{result.feedback}</Text>
                 </View>
-              </>
-            ) : null}
-          </View>
-        ) : null}
+              </> :
+        null}
+          </View> :
+      null}
       </ScrollView>
-    </SafeAreaView>
-  );
+    </>;
+
+
+  return embedded ? content :
+  <SafeAreaView style={styles.safeArea} edges={['top']}>{content}</SafeAreaView>;
+
 }
 
 const makeStyles = (colors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.pageBg,
+    backgroundColor: colors.pageBg
   },
   header: {
     backgroundColor: colors.headerBg,
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: 24
   },
   title: {
-    fontSize: 30,
+    fontSize: 30
   },
   titleBold: {
     fontFamily: titleFont,
     fontWeight: '700',
-    color: '#fff',
+    color: '#fff'
   },
   titleItalic: {
     fontFamily: titleFont,
     fontStyle: 'italic',
-    color: '#fff',
+    color: '#fff'
   },
   subtitle: {
     marginTop: 6,
     fontSize: 14,
     fontWeight: '600',
-    color: '#cfc9bd',
+    color: '#cfc9bd'
   },
   body: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 40
   },
   label: {
     fontSize: 11,
@@ -176,7 +184,7 @@ const makeStyles = (colors) => StyleSheet.create({
     letterSpacing: 0.5,
     color: colors.textMuted,
     marginBottom: 6,
-    marginTop: 4,
+    marginTop: 4
   },
   input: {
     backgroundColor: colors.cardBg,
@@ -187,19 +195,19 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: colors.textDark,
-    marginBottom: 16,
+    marginBottom: 16
   },
   textArea: {
     minHeight: 110,
-    textAlignVertical: 'top',
+    textAlignVertical: 'top'
   },
   actionRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 22,
+    marginBottom: 22
   },
   checkButton: {
-    flex: 1,
+    flex: 1
   },
   clearButton: {
     flexDirection: 'row',
@@ -211,12 +219,12 @@ const makeStyles = (colors) => StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 10,
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 16
   },
   clearButtonText: {
     color: colors.die.text,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   statusBanner: {
     flexDirection: 'row',
@@ -226,11 +234,11 @@ const makeStyles = (colors) => StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    marginBottom: 18,
+    marginBottom: 18
   },
   statusText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   correctionCard: {
     backgroundColor: colors.das.bg,
@@ -239,13 +247,13 @@ const makeStyles = (colors) => StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    marginBottom: 18,
+    marginBottom: 18
   },
   correctionText: {
     fontSize: 16,
     color: colors.das.text,
     fontWeight: '600',
-    lineHeight: 23,
+    lineHeight: 23
   },
   feedbackCard: {
     backgroundColor: colors.cardBg,
@@ -253,11 +261,11 @@ const makeStyles = (colors) => StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 14
   },
   feedbackText: {
     fontSize: 15,
     color: colors.textDark,
-    lineHeight: 22,
-  },
+    lineHeight: 22
+  }
 });

@@ -62,6 +62,12 @@ export function AuthProvider({ children }) {
     return updatedUser;
   }, []);
 
+  const updateProfile = useCallback(async (name) => {
+    const updatedUser = await authService.updateProfile(name);
+    setUser(updatedUser);
+    return updatedUser;
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -74,6 +80,7 @@ export function AuthProvider({ children }) {
         resetPassword,
         loginWithGoogle,
         linkGoogle,
+        updateProfile,
         logout,
         deleteAccount,
       }}

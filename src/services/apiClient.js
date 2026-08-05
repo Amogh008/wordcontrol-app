@@ -1,13 +1,14 @@
 import axios from 'axios';
 import { getToken } from './tokenStore';
+import { applyLanguageProfileHeader } from './languageProfileStore';
 
-const LOCAL_API_URL = 'http://localhost:4001';
-const HOSTED_API_URL = 'https://wordcontrol.onrender.com';
+const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
-export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_APP_ENV === 'development'
-    ? LOCAL_API_URL
-    : process.env.EXPO_PUBLIC_API_URL || HOSTED_API_URL;
+if (!configuredApiUrl) {
+  throw new Error('EXPO_PUBLIC_API_URL is required. Set it in the active Expo environment file.');
+}
+
+export const API_BASE_URL = configuredApiUrl.replace(/\/+$/, '');
 
 export const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/word`,
@@ -18,5 +19,5 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  return config;
+  return applyLanguageProfileHeader(config);
 });
