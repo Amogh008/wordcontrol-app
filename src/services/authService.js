@@ -65,3 +65,22 @@ export async function linkGoogle(idToken) {
   const { data } = await authClient.post('/link-google', { idToken });
   return data.user;
 }
+
+export async function updateProfile(name) {
+  const { data } = await authClient.patch('/me/profile', { name });
+  return data.user;
+}
+
+export async function getProfilePhoto(size = 'avatar') {
+  const { data } = await authClient.get('/me/profile-photo', { params: { size } });
+  return data.photo;
+}
+
+export async function uploadProfilePhoto({ base64, avatarBase64, contentType }) {
+  const { data } = await authClient.put('/me/profile-photo', { base64, avatarBase64, contentType });
+  return data.photo;
+}
+
+export async function deleteProfilePhoto() {
+  await authClient.delete('/me/profile-photo');
+}

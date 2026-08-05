@@ -1,24 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { localize, localizeFormat } from "../locales";import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  View,
-} from 'react-native';
+  View } from
+'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { API_BASE_URL } from '../services/apiClient';
 import { createRealtimeConnection } from '../services/realtimeService';
 import MatchmakingModal from './MatchmakingModal';
+import { useLanguageProfile } from '../context/LanguageProfileContext';
 
 export default function SpeakingNetworkView({ onExit }) {
   const { colors } = useTheme();
   const { language } = useLanguage();
-  const { user } = useAuth();
+  const { activeProfile } = useLanguageProfile();
   const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const socketRef = useRef(null);
@@ -49,10 +50,10 @@ export default function SpeakingNetworkView({ onExit }) {
     socket.on('connect_error', (connectionError) => {
       setConnectionState('disconnected');
       const reason = connectionError?.message || 'Unknown connection error';
-      setError(
-        isDe
-          ? `Die Verbindung zum Netzwerk ist fehlgeschlagen: ${reason} (${API_BASE_URL})`
-          : `Could not connect to the network: ${reason} (${API_BASE_URL})`,
+      setError(localizeFormat("Could not connect to the network: {0} ({1})", [
+
+
+      reason, API_BASE_URL])
       );
     });
     socket.on('presence:list', (users) => {
@@ -72,10 +73,10 @@ export default function SpeakingNetworkView({ onExit }) {
       setMatching(false);
       setMatch(null);
       setSearchOpen(false);
-      setError(
-        isDe
-          ? 'Deine Verfügbarkeit wurde auf ein anderes Gerät verschoben.'
-          : 'Your availability was moved to another device.',
+      setError(localize(
+
+
+        'Your availability was moved to another device.')
       );
     });
     socket.on('match:found', ({ partner, callId, transferred = false }) => {
@@ -132,11 +133,11 @@ export default function SpeakingNetworkView({ onExit }) {
         return;
       }
       setError(
-        result?.code === 'ACTIVE_CALL'
-          ? (isDe
-              ? 'Die Verfügbarkeit kann während eines aktiven Gesprächs nicht verschoben werden.'
-              : 'Availability cannot be moved during an active call.')
-          : (isDe ? 'Verfügbarkeit konnte nicht verschoben werden.' : 'Could not move availability.'),
+        result?.code === 'ACTIVE_CALL' ? localize(
+
+
+          'Availability cannot be moved during an active call.') : localize(
+          'Could not move availability.')
       );
     });
   };
@@ -149,7 +150,7 @@ export default function SpeakingNetworkView({ onExit }) {
     setError('');
     socket.emit('match:join', (result) => {
       if (!result?.ok) {
-        setError(result?.error || (isDe ? 'Matching konnte nicht gestartet werden.' : 'Could not start matching.'));
+        setError(result?.error || localize('Could not start matching.'));
         return;
       }
       setMatching(result.waiting === true);
@@ -178,54 +179,44 @@ export default function SpeakingNetworkView({ onExit }) {
   };
 
   const statusLabel = (status) => ({
-    in_call: isDe ? 'Im Gespräch' : 'On call',
-    matched: isDe ? 'Macht sich bereit' : 'Getting ready',
-    searching: isDe ? 'Sucht einen Partner' : 'Searching',
-    available: isDe ? 'Bereit zum Üben' : 'Ready to practise',
-    online: isDe ? 'Online' : 'Online',
-  }[status] || (isDe ? 'Online' : 'Online'));
+    in_call: localize('On call'),
+    matched: localize('Getting ready'),
+    searching: localize('Searching'),
+    available: localize('Ready to practise'),
+    online: localize('Online')
+  })[status] || localize('Online');
 
-  const others = onlineUsers.filter((onlineUser) => onlineUser.id !== user?.id);
+  const others = onlineUsers.filter((onlineUser) => onlineUser.id !== activeProfile?.id);
   const connected = connectionState === 'connected';
 
   return (
     <View style={styles.container}>
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, !onExit && styles.topBarStandalone]}>
+        {onExit ?
         <Pressable onPress={onExit} hitSlop={8} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={20} color={colors.textDark} />
-          <Text style={styles.backText}>{isDe ? 'Spiele' : 'Games'}</Text>
-        </Pressable>
+            <Ionicons name="chevron-back" size={20} color={colors.textDark} />
+            <Text style={styles.backText}>{localize('Games')}</Text>
+          </Pressable> :
+        <View />}
         <View style={styles.connectionPill}>
           <View style={[styles.connectionDot, connected && styles.connectionDotOnline]} />
           <Text style={styles.connectionText}>
-            {connectionState === 'connecting'
-              ? (isDe ? 'Verbinden…' : 'Connecting…')
-              : connected
-                ? (isDe ? 'Verbunden' : 'Connected')
-                : (isDe ? 'Getrennt' : 'Disconnected')}
+            {connectionState === 'connecting' ? localize(
+              'Connecting…') :
+            connected ? localize(
+              'Connected') : localize(
+              'Disconnected')}
           </Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Ionicons name="people" size={30} color="#155a6a" />
-          </View>
-          <Text style={styles.heroTitle}>{isDe ? 'Sprech-Netzwerk' : 'Speaking Network'}</Text>
-          <Text style={styles.heroSubtitle}>
-            {isDe
-              ? 'Finde Lernpartner, übe Deutsch und knüpfe neue Kontakte.'
-              : 'Find learning partners, practise German and make new connections.'}
-          </Text>
-        </View>
-
         <View style={styles.card}>
           <View style={styles.cardHeadingRow}>
             <View>
-              <Text style={styles.cardTitle}>{isDe ? 'Jetzt verfügbar' : 'Available now'}</Text>
+              <Text style={styles.cardTitle}>{localize('Available now')}</Text>
               <Text style={styles.cardSubtitle}>
-                {isDe ? 'Andere können dich sehen und mit dir üben.' : 'Others can see that you are ready to practise.'}
+                {localize('Others can see that you are ready to practise.')}
               </Text>
             </View>
             <Pressable
@@ -233,68 +224,68 @@ export default function SpeakingNetworkView({ onExit }) {
               disabled={!connected || !!match || availableElsewhere}
               accessibilityRole="switch"
               accessibilityState={{ checked: available, disabled: !connected || !!match || availableElsewhere }}
-              style={[styles.switchTrack, available && styles.switchTrackActive, (!connected || !!match || availableElsewhere) && styles.disabled]}
-            >
+              style={[styles.switchTrack, available && styles.switchTrackActive, (!connected || !!match || availableElsewhere) && styles.disabled]}>
+
               <View style={[styles.switchThumb, available && styles.switchThumbActive]} />
             </Pressable>
           </View>
         </View>
 
-        {availableElsewhere ? (
-          <View style={styles.elsewhereCard}>
+        {availableElsewhere ?
+        <View style={styles.elsewhereCard}>
             <View style={styles.elsewhereIcon}>
               <Ionicons name="phone-portrait-outline" size={22} color="#8a5a00" />
             </View>
             <View style={styles.elsewhereCopy}>
               <Text style={styles.elsewhereTitle}>
-                {callElsewhere
-                  ? (isDe
-                      ? 'Du führst bereits ein Gespräch auf einem anderen Gerät oder Login'
-                      : 'You already have an active call on another login or device')
-                  : (isDe
-                      ? 'Du hast deine Online-Verfügbarkeit bereits auf einem anderen Gerät oder Login aktiviert'
-                      : 'You already turned on your online availability from another login or device')}
+                {callElsewhere ? localize(
+
+
+                'You already have an active call on another login or device') : localize(
+
+
+                'You already turned on your online availability from another login or device')}
               </Text>
               <Text style={styles.elsewhereText}>
-                {callElsewhere
-                  ? (isDe
-                      ? 'Verschiebe das laufende Gespräch und deine Verfügbarkeit auf dieses Gerät.'
-                      : 'Move the ongoing call and your availability to this device.')
-                  : (isDe
-                      ? 'Nur ein Gerät kann gleichzeitig Verbindungen empfangen.'
-                      : 'Only one device can receive connections at a time.')}
+                {callElsewhere ? localize(
+
+
+                'Move the ongoing call and your availability to this device.') : localize(
+
+
+                'Only one device can receive connections at a time.')}
               </Text>
             </View>
             <Pressable style={styles.moveButton} onPress={moveAvailabilityHere}>
               <Text style={styles.moveButtonText}>
-                {callElsewhere
-                  ? (isDe ? 'Gespräch hierher' : 'Move call here')
-                  : (isDe ? 'Hierher verschieben' : 'Move here')}
+                {callElsewhere ? localize(
+                'Move call here') : localize(
+                'Move here')}
               </Text>
             </Pressable>
-          </View>
-        ) : null}
+          </View> :
+        null}
 
         <Pressable
           style={[
-            styles.matchButton,
-            matching && styles.matchButtonSearching,
-            (!available || !connected || !!match || availableElsewhere) && styles.disabled,
-          ]}
+          styles.matchButton,
+          matching && styles.matchButtonSearching,
+          (!available || !connected || !!match || availableElsewhere) && styles.disabled]
+          }
           onPress={() => setSearchOpen(true)}
-          disabled={!available || !connected || !!match || availableElsewhere}
-        >
+          disabled={!available || !connected || !!match || availableElsewhere}>
+
           {matching ? <ActivityIndicator size="small" color="#155a6a" /> : <Ionicons name="shuffle" size={21} color="#155a6a" />}
           <View style={styles.matchCopy}>
             <Text style={styles.matchTitle}>
-              {matching
-                ? (isDe ? 'Partner wird gesucht…' : 'Finding a partner…')
-                : (isDe ? 'Zufällig verbinden' : 'Random connect')}
+              {matching ? localize(
+                'Finding a partner…') : localize(
+                'Random connect')}
             </Text>
             <Text style={styles.matchSubtitle}>
-              {matching
-                ? (isDe ? 'Tippe erneut, um abzubrechen.' : 'Tap again to cancel.')
-                : (isDe ? 'Mit einem verfügbaren Lernenden verbinden.' : 'Connect with an available learner.')}
+              {matching ? localize(
+                'Tap again to cancel.') : localize(
+                'Connect with an available learner.')}
             </Text>
           </View>
         </Pressable>
@@ -302,30 +293,32 @@ export default function SpeakingNetworkView({ onExit }) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{isDe ? 'Jetzt online' : 'Now online'}</Text>
+          <Text style={styles.sectionTitle}>{localize('Now online')}</Text>
           <Text style={styles.count}>{others.length}</Text>
         </View>
         <View style={styles.card}>
-          {others.length === 0 ? (
-            <View style={styles.emptyState}>
+          {others.length === 0 ?
+          <View style={styles.emptyState}>
               <Ionicons name="moon-outline" size={24} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>{isDe ? 'Noch niemand verfügbar' : 'Nobody available yet'}</Text>
+              <Text style={styles.emptyTitle}>{localize('Nobody available yet')}</Text>
               <Text style={styles.emptyText}>
-                {isDe ? 'Lade einen Freund ein oder versuche es später erneut.' : 'Invite a friend or check again later.'}
+                {localize('Invite a friend or check again later.')}
               </Text>
-            </View>
-          ) : (
-            others.map((onlineUser, index) => (
-              <View key={onlineUser.id} style={[styles.userRow, index > 0 && styles.userRowBorder]}>
+            </View> :
+
+          others.map((onlineUser, index) =>
+          <View key={onlineUser.id} style={[styles.userRow, index > 0 && styles.userRowBorder]}>
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{onlineUser.name.slice(0, 1).toUpperCase()}</Text>
-                  {onlineUser.status === 'in_call' ? (
-                    <View style={styles.callBadge}>
+                  {onlineUser.avatar ?
+              <Image source={{ uri: onlineUser.avatar }} style={styles.avatarImage} /> :
+              <Text style={styles.avatarText}>{onlineUser.name.slice(0, 1).toUpperCase()}</Text>}
+                  {onlineUser.status === 'in_call' ?
+              <View style={styles.callBadge}>
                       <Ionicons name="call" size={8} color="#fff" />
-                    </View>
-                  ) : (
-                    <View style={styles.onlineBadge} />
-                  )}
+                    </View> :
+
+              <View style={styles.onlineBadge} />
+              }
                 </View>
                 <View style={styles.userCopy}>
                   <Text style={styles.userName}>{onlineUser.name}</Text>
@@ -334,24 +327,24 @@ export default function SpeakingNetworkView({ onExit }) {
                   </Text>
                 </View>
                 <Ionicons
-                  name={onlineUser.status === 'in_call' ? 'call' : 'headset-outline'}
-                  size={20}
-                  color={onlineUser.status === 'in_call' ? '#e67700' : colors.misc.text}
-                />
+              name={onlineUser.status === 'in_call' ? 'call' : 'headset-outline'}
+              size={20}
+              color={onlineUser.status === 'in_call' ? '#e67700' : colors.misc.text} />
+
               </View>
-            ))
-          )}
+          )
+          }
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{isDe ? 'Freunde online' : 'Friends online'}</Text>
-          <Text style={styles.count}>0</Text>
+          <Text style={styles.sectionTitle}>{localize('Friends online')}</Text>
+          <Text style={styles.count}>{localize("0")}</Text>
         </View>
         <View style={styles.card}>
           <Text style={styles.emptyText}>
-            {isDe
-              ? 'Freundschaften werden nach dem ersten erfolgreichen Gespräch aktiviert.'
-              : 'Friend connections will be enabled after the first successful conversation flow.'}
+            {localize(
+
+              'Friend connections will be enabled after the first successful conversation flow.')}
           </Text>
         </View>
       </ScrollView>
@@ -365,15 +358,16 @@ export default function SpeakingNetworkView({ onExit }) {
         onStartSearch={startMatching}
         onRetry={startMatching}
         onCancel={cancelMatching}
-        onFinished={finishCall}
-      />
-    </View>
-  );
+        onFinished={finishCall} />
+
+    </View>);
+
 }
 
 const makeStyles = (colors) => StyleSheet.create({
   container: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  topBarStandalone: { justifyContent: 'flex-start' },
   backButton: { flexDirection: 'row', alignItems: 'center' },
   backText: { color: colors.textDark, fontSize: 14, fontWeight: '700' },
   connectionPill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
@@ -381,10 +375,6 @@ const makeStyles = (colors) => StyleSheet.create({
   connectionDotOnline: { backgroundColor: '#2f9e44' },
   connectionText: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
   content: { paddingTop: 8, paddingBottom: 32, gap: 14 },
-  hero: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16 },
-  heroIcon: { width: 58, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#bfeefa' },
-  heroTitle: { marginTop: 12, color: colors.textDark, fontSize: 24, fontWeight: '800' },
-  heroSubtitle: { marginTop: 6, color: colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 420 },
   card: { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 16 },
   cardHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
   cardTitle: { color: colors.textDark, fontSize: 15, fontWeight: '800' },
@@ -416,11 +406,12 @@ const makeStyles = (colors) => StyleSheet.create({
   userRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   userRowBorder: { marginTop: 10, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.border },
   avatar: { position: 'relative', width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.misc.bg },
+  avatarImage: { width: 40, height: 40, borderRadius: 20 },
   avatarText: { color: colors.misc.text, fontSize: 16, fontWeight: '900' },
   onlineBadge: { position: 'absolute', right: 0, bottom: 0, width: 11, height: 11, borderRadius: 6, borderWidth: 2, borderColor: colors.cardBg, backgroundColor: '#2f9e44' },
   callBadge: { position: 'absolute', right: -2, bottom: -2, width: 17, height: 17, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.cardBg, backgroundColor: '#e67700' },
   userCopy: { flex: 1, marginLeft: 11 },
   userName: { color: colors.textDark, fontSize: 14, fontWeight: '800' },
   userStatus: { marginTop: 2, color: colors.textMuted, fontSize: 11 },
-  userStatusOnCall: { color: '#e67700', fontWeight: '800' },
+  userStatusOnCall: { color: '#e67700', fontWeight: '800' }
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { localize, localizeFormat } from "../locales";import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -7,9 +7,10 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  View,
-} from 'react-native';
+  View } from
+'react-native';
 import { Picker } from '@react-native-picker/picker';
+import { HazyPicker } from './HazySelect';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -25,7 +26,7 @@ function createRadarBlips() {
       id: `${Date.now()}-${index}-${Math.random()}`,
       size,
       left: 115 + Math.cos(angle) * radius - size / 2,
-      top: 115 + Math.sin(angle) * radius - size / 2,
+      top: 115 + Math.sin(angle) * radius - size / 2
     };
   });
 }
@@ -39,7 +40,7 @@ export default function MatchmakingModal({
   onStartSearch,
   onRetry,
   onCancel,
-  onFinished,
+  onFinished
 }) {
   const { colors } = useTheme();
   const { language } = useLanguage();
@@ -96,36 +97,36 @@ export default function MatchmakingModal({
     radar.setValue(0);
     const pulseAnimation = Animated.loop(
       Animated.sequence([
-        Animated.timing(radar, {
-          toValue: 1,
-          duration: 1800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(radar, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ]),
-      { iterations: -1, resetBeforeIteration: true },
+      Animated.timing(radar, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true
+      }),
+      Animated.timing(radar, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: true
+      })]
+      ),
+      { iterations: -1, resetBeforeIteration: true }
     );
     radarSweep.setValue(0);
     const sweepAnimation = Animated.loop(
       Animated.sequence([
-        Animated.timing(radarSweep, {
-          toValue: 1,
-          duration: 2400,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        Animated.timing(radarSweep, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ]),
-      { iterations: -1, resetBeforeIteration: true },
+      Animated.timing(radarSweep, {
+        toValue: 1,
+        duration: 2400,
+        easing: Easing.linear,
+        useNativeDriver: true
+      }),
+      Animated.timing(radarSweep, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: true
+      })]
+      ),
+      { iterations: -1, resetBeforeIteration: true }
     );
     pulseAnimation.start();
     sweepAnimation.start();
@@ -143,7 +144,7 @@ export default function MatchmakingModal({
         toValue: 0,
         duration: 380,
         easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start(({ finished }) => {
         if (!finished || !active) return;
         setRadarBlips(createRadarBlips());
@@ -151,7 +152,7 @@ export default function MatchmakingModal({
           toValue: 1,
           duration: 520,
           easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: true
         }).start();
       });
     };
@@ -172,7 +173,7 @@ export default function MatchmakingModal({
       toValue: 0,
       duration: 60000,
       easing: Easing.linear,
-      useNativeDriver: false,
+      useNativeDriver: false
     });
     animation.start();
     const timer = setInterval(() => {
@@ -191,7 +192,7 @@ export default function MatchmakingModal({
     const animation = Animated.timing(timeoutProgress, {
       toValue: 0,
       duration: 10000,
-      useNativeDriver: false,
+      useNativeDriver: false
     });
     animation.start();
     const countdownTimer = setInterval(() => {
@@ -213,18 +214,18 @@ export default function MatchmakingModal({
       return;
     }
     if (Platform.OS !== 'web' || !globalThis.isSecureContext) {
-      setError(isDe ? 'Der Mikrofontest benötigt HTTPS oder localhost.' : 'The microphone test requires HTTPS or localhost.');
+      setError(localize('The microphone test requires HTTPS or localhost.'));
       return;
     }
     try {
       setError('');
-      const audio = selectedDeviceId
-        ? { deviceId: { exact: selectedDeviceId } }
-        : true;
+      const audio = selectedDeviceId ?
+      { deviceId: { exact: selectedDeviceId } } :
+      true;
       const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
       testStreamRef.current = stream;
-      const inputs = (await navigator.mediaDevices.enumerateDevices())
-        .filter((device) => device.kind === 'audioinput');
+      const inputs = (await navigator.mediaDevices.enumerateDevices()).
+      filter((device) => device.kind === 'audioinput');
       setDevices(inputs);
       const activeDeviceId = stream.getAudioTracks()[0]?.getSettings?.().deviceId || selectedDeviceId;
       if (activeDeviceId) setSelectedDeviceId(activeDeviceId);
@@ -244,7 +245,7 @@ export default function MatchmakingModal({
       setTesting(true);
       setMicReady(true);
     } catch (microphoneError) {
-      setError(microphoneError.message || (isDe ? 'Das Mikrofon konnte nicht getestet werden.' : 'Could not test the microphone.'));
+      setError(microphoneError.message || localize('Could not test the microphone.'));
       stopTest();
     }
   };
@@ -277,76 +278,76 @@ export default function MatchmakingModal({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={match ? () => {} : close}
-    >
+      onRequestClose={match ? () => {} : close}>
+
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.eyebrow}>{isDe ? 'SPRECH-NETZWERK' : 'SPEAKING NETWORK'}</Text>
+              <Text style={styles.eyebrow}>{localize('SPEAKING NETWORK')}</Text>
               <Text style={styles.title}>
-                {match
-                  ? (isDe ? 'Verbindung gefunden' : 'Connection found')
-                  : timedOut
-                    ? (isDe ? 'Suche beendet' : 'Search finished')
-                  : searchStarted
-                    ? (isDe ? 'Lernpartner suchen' : 'Finding a partner')
-                    : (isDe ? 'Audio vorbereiten' : 'Prepare your audio')}
+                {match ? localize(
+                  'Connection found') :
+                timedOut ? localize(
+                  'Search finished') :
+                searchStarted ? localize(
+                  'Finding a partner') : localize(
+                  'Prepare your audio')}
               </Text>
             </View>
-            {!match ? (
-              <Pressable onPress={close} hitSlop={8} style={styles.closeButton}>
+            {!match ?
+            <Pressable onPress={close} hitSlop={8} style={styles.closeButton}>
                 <Ionicons name="close" size={22} color={colors.textDark} />
-              </Pressable>
-            ) : null}
+              </Pressable> :
+            null}
           </View>
 
-          {match && socket ? (
-            <WebAudioCall
-              key={match.callId}
-              socket={socket}
-              match={match}
-              selectedDeviceId={selectedDeviceId}
-              onFinished={onFinished}
-            />
-          ) : timedOut ? (
-            <View style={styles.noMatchBody}>
+          {match && socket ?
+          <WebAudioCall
+            key={match.callId}
+            socket={socket}
+            match={match}
+            selectedDeviceId={selectedDeviceId}
+            onFinished={onFinished} /> :
+
+          timedOut ?
+          <View style={styles.noMatchBody}>
               <View style={styles.noMatchIcon}>
                 <Ionicons name="search-outline" size={34} color="#8a5a00" />
               </View>
-              <Text style={styles.noMatchTitle}>{isDe ? 'Kein Match gefunden' : 'No match found'}</Text>
+              <Text style={styles.noMatchTitle}>{localize('No match found')}</Text>
               <Text style={styles.noMatchText}>
-                {isDe
-                  ? 'Innerhalb einer Minute war kein verfügbarer Lernpartner erreichbar.'
-                  : 'No available learning partner was found within one minute.'}
+                {localize(
+
+                'No available learning partner was found within one minute.')}
               </Text>
               <Pressable style={styles.retryButton} onPress={retrySearch}>
                 <Ionicons name="refresh" size={19} color="#155a6a" />
-                <Text style={styles.retryText}>{isDe ? 'Erneut versuchen' : 'Retry'}</Text>
+                <Text style={styles.retryText}>{localize('Retry')}</Text>
               </Pressable>
               <Text style={styles.timeoutText}>
-                {isDe
-                  ? `Automatische Rückkehr in ${timeoutCountdown} Sekunden.`
-                  : `Returning automatically in ${timeoutCountdown} seconds.`}
+                {localizeFormat("Returning automatically in {0} seconds.", [
+
+              timeoutCountdown])}
               </Text>
               <Pressable style={styles.timeoutBackButton} onPress={close}>
                 <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.timeoutBackProgress,
-                    {
-                      width: timeoutProgress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
-                    },
-                  ]}
-                />
-                <Text style={styles.timeoutBackText}>{isDe ? 'Zurück zum Netzwerk' : 'Back to network'}</Text>
+                pointerEvents="none"
+                style={[
+                styles.timeoutBackProgress,
+                {
+                  width: timeoutProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%']
+                  })
+                }]
+                } />
+
+                <Text style={styles.timeoutBackText}>{localize('Back to network')}</Text>
               </Pressable>
-            </View>
-          ) : searchStarted ? (
-            <View style={styles.searchBody}>
+            </View> :
+          searchStarted ?
+          <View style={styles.searchBody}>
               <View style={styles.radarWrap}>
                 <Animated.View style={[styles.radarRing, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]} />
                 <View style={styles.radarMiddleRing} />
@@ -358,120 +359,118 @@ export default function MatchmakingModal({
                   <View style={styles.radarSweepGlow} />
                 </Animated.View>
                 <Animated.View pointerEvents="none" style={[styles.radarBlips, { opacity: blipOpacity }]}>
-                  {radarBlips.map((blip) => (
-                    <View
-                      key={blip.id}
-                      style={[
-                        styles.radarBlip,
-                        {
-                          width: blip.size,
-                          height: blip.size,
-                          borderRadius: blip.size / 2,
-                          left: blip.left,
-                          top: blip.top,
-                        },
-                      ]}
-                    />
-                  ))}
+                  {radarBlips.map((blip) =>
+                <View
+                  key={blip.id}
+                  style={[
+                  styles.radarBlip,
+                  {
+                    width: blip.size,
+                    height: blip.size,
+                    borderRadius: blip.size / 2,
+                    left: blip.left,
+                    top: blip.top
+                  }]
+                  } />
+
+                )}
                 </Animated.View>
                 <View style={styles.radarCenter}>
                   <Ionicons name="person" size={30} color="#155a6a" />
                 </View>
               </View>
               <Text style={styles.searchTitle}>
-                {matching ? (isDe ? 'Suche weltweit…' : 'Searching worldwide…') : (isDe ? 'Verbindung wird vorbereitet…' : 'Preparing connection…')}
+                {matching ? localize('Searching worldwide…') : localize('Preparing connection…')}
               </Text>
               <Text style={styles.searchHint}>
-                {isDe ? 'Wir suchen einen verfügbaren Deutsch-Lernpartner für dich.' : 'We are looking for an available German learning partner.'}
+                {localize('We are looking for an available German learning partner.')}
               </Text>
               <View style={styles.searchTimerRow}>
-                <Text style={styles.searchTimerLabel}>{isDe ? 'Verbleibende Suchzeit' : 'Search time remaining'}</Text>
-                <Text style={styles.searchTimerValue}>{searchSeconds}s</Text>
+                <Text style={styles.searchTimerLabel}>{localize('Search time remaining')}</Text>
+                <Text style={styles.searchTimerValue}>{searchSeconds}{localize("s")}</Text>
               </View>
               <View style={styles.searchProgressTrack} accessibilityRole="progressbar">
                 <Animated.View
-                  style={[
-                    styles.searchProgressFill,
-                    {
-                      width: searchProgress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
-                      backgroundColor: searchProgress.interpolate({
-                        inputRange: [0, 0.5, 1],
-                        outputRange: ['#e03131', '#f2c94c', '#2f9e44'],
-                      }),
-                    },
-                  ]}
-                />
+                style={[
+                styles.searchProgressFill,
+                {
+                  width: searchProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%']
+                  }),
+                  backgroundColor: searchProgress.interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: ['#e03131', '#f2c94c', '#2f9e44']
+                  })
+                }]
+                } />
+
               </View>
               <Pressable style={styles.cancelButton} onPress={close}>
-                <Text style={styles.cancelText}>{isDe ? 'Suche abbrechen' : 'Cancel search'}</Text>
+                <Text style={styles.cancelText}>{localize('Cancel search')}</Text>
               </Pressable>
-            </View>
-          ) : (
-            <View style={styles.setupBody}>
+            </View> :
+
+          <View style={styles.setupBody}>
               <View style={styles.settingCard}>
                 <View style={styles.settingHeading}>
                   <Ionicons name="mic" size={21} color="#155a6a" />
                   <View style={styles.settingCopy}>
-                    <Text style={styles.settingTitle}>{isDe ? 'Mikrofon' : 'Microphone'}</Text>
-                    <Text style={styles.settingSubtitle}>{isDe ? 'Wähle und teste deine Stimme vor der Suche.' : 'Choose and test your voice before searching.'}</Text>
+                    <Text style={styles.settingTitle}>{localize('Microphone')}</Text>
+                    <Text style={styles.settingSubtitle}>{localize('Choose and test your voice before searching.')}</Text>
                   </View>
                 </View>
 
-                {devices.length > 0 ? (
-                  <View style={styles.pickerWrap}>
-                    <Picker
-                      selectedValue={selectedDeviceId}
-                      onValueChange={setSelectedDeviceId}
-                      style={styles.picker}
-                    >
-                      {devices.map((device, index) => (
-                        <Picker.Item
-                          key={device.deviceId}
-                          label={device.label || `${isDe ? 'Mikrofon' : 'Microphone'} ${index + 1}`}
-                          value={device.deviceId}
-                        />
-                      ))}
-                    </Picker>
-                  </View>
-                ) : null}
+                {devices.length > 0 ?
+              <HazyPicker containerStyle={styles.pickerWrap}
+                  selectedValue={selectedDeviceId}
+                  onValueChange={setSelectedDeviceId}
+                  pickerStyle={styles.picker}>
+
+                      {devices.map((device, index) =>
+                  <Picker.Item
+                    key={device.deviceId}
+                    label={device.label || `${localize('Microphone')} ${index + 1}`}
+                    value={device.deviceId} />
+
+                  )}
+                  </HazyPicker> :
+              null}
 
                 <View style={styles.meterTrack}>
                   <View style={[styles.meterFill, { width: `${Math.max(level, micReady ? 4 : 0)}%` }]} />
                 </View>
                 <View style={styles.meterLabels}>
-                  <Text style={styles.meterText}>{isDe ? 'Leise' : 'Quiet'}</Text>
-                  <Text style={styles.meterText}>{isDe ? 'Laut' : 'Loud'}</Text>
+                  <Text style={styles.meterText}>{localize('Quiet')}</Text>
+                  <Text style={styles.meterText}>{localize('Loud')}</Text>
                 </View>
 
                 <Pressable style={styles.testButton} onPress={testMicrophone}>
                   <Ionicons name={testing ? 'stop-circle' : 'mic-circle'} size={20} color="#155a6a" />
                   <Text style={styles.testText}>
-                    {testing ? (isDe ? 'Test beenden' : 'Stop test') : (isDe ? 'Mikrofon testen' : 'Test microphone')}
+                    {testing ? localize('Stop test') : localize('Test microphone')}
                   </Text>
                 </Pressable>
               </View>
 
-              {micReady ? (
-                <View style={styles.readyRow}>
+              {micReady ?
+            <View style={styles.readyRow}>
                   <Ionicons name="checkmark-circle" size={19} color="#2f9e44" />
-                  <Text style={styles.readyText}>{isDe ? 'Mikrofon ist bereit' : 'Microphone is ready'}</Text>
-                </View>
-              ) : null}
+                  <Text style={styles.readyText}>{localize('Microphone is ready')}</Text>
+                </View> :
+            null}
               {error ? <Text style={styles.error}>{error}</Text> : null}
 
               <Pressable style={styles.searchButton} onPress={beginSearch}>
                 <Ionicons name="radio" size={20} color="#155a6a" />
-                <Text style={styles.searchButtonText}>{isDe ? 'Zufällige Suche starten' : 'Start random search'}</Text>
+                <Text style={styles.searchButtonText}>{localize('Start random search')}</Text>
               </Pressable>
             </View>
-          )}
+          }
         </View>
       </View>
-    </Modal>
-  );
+    </Modal>);
+
 }
 
 const makeStyles = (colors) => StyleSheet.create({
@@ -487,8 +486,8 @@ const makeStyles = (colors) => StyleSheet.create({
   settingCopy: { flex: 1, marginLeft: 10 },
   settingTitle: { color: colors.textDark, fontSize: 15, fontWeight: '900' },
   settingSubtitle: { marginTop: 2, color: colors.textMuted, fontSize: 11, lineHeight: 16 },
-  pickerWrap: { marginTop: 14, overflow: 'hidden', borderRadius: 10, borderWidth: 1, borderColor: colors.border },
-  picker: { color: colors.textDark, backgroundColor: colors.pageBg },
+  pickerWrap: { marginTop: 14 },
+  picker: { color: colors.textDark },
   meterTrack: { marginTop: 16, height: 9, overflow: 'hidden', borderRadius: 5, backgroundColor: colors.border },
   meterFill: { height: '100%', borderRadius: 5, backgroundColor: '#62d6ee' },
   meterLabels: { marginTop: 4, flexDirection: 'row', justifyContent: 'space-between' },
@@ -531,5 +530,5 @@ const makeStyles = (colors) => StyleSheet.create({
   timeoutText: { marginTop: 15, color: colors.textMuted, fontSize: 11 },
   timeoutBackButton: { position: 'relative', width: '100%', minHeight: 46, marginTop: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: '#62d6ee', backgroundColor: colors.cardBg },
   timeoutBackProgress: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: '#bfeefa' },
-  timeoutBackText: { zIndex: 1, color: '#fff', fontSize: 12, fontWeight: '900', textShadowColor: '#000', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 2 },
+  timeoutBackText: { zIndex: 1, color: '#fff', fontSize: 12, fontWeight: '900', textShadowColor: '#000', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 2 }
 });

@@ -74,29 +74,11 @@ export default function BottomBar({ tab, onChange }) {
         styles={styles}
       />
       <TabItem
-        icon="language"
+        icon="flask"
         iconSize={iconSize}
-        label={t('translate')}
-        active={tab === 'translate'}
-        onPress={() => onChange('translate')}
-        colors={colors}
-        styles={styles}
-      />
-      <TabItem
-        icon="library"
-        iconSize={iconSize}
-        label={t('dictionary')}
-        active={tab === 'dictionary'}
-        onPress={() => onChange('dictionary')}
-        colors={colors}
-        styles={styles}
-      />
-      <TabItem
-        icon="school"
-        iconSize={iconSize}
-        label={t('grammar')}
-        active={tab === 'grammar'}
-        onPress={() => onChange('grammar')}
+        label={t('languageLab')}
+        active={tab === 'lab'}
+        onPress={() => onChange('lab')}
         colors={colors}
         styles={styles}
       />
@@ -119,11 +101,11 @@ export default function BottomBar({ tab, onChange }) {
         styles={styles}
       />
       <TabItem
-        icon="settings"
+        icon="people"
         iconSize={iconSize}
-        label={t('settings')}
-        active={tab === 'settings'}
-        onPress={() => onChange('settings')}
+        label={t('network')}
+        active={tab === 'network'}
+        onPress={() => onChange('network')}
         colors={colors}
         styles={styles}
       />

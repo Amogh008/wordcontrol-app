@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { localize, localizeFormat } from "../locales";import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import NestedConfirmDialog from './NestedConfirmDialog';
 
 export default function WebAudioCall({ socket, match, selectedDeviceId, onFinished }) {
   const { colors } = useTheme();
@@ -50,7 +51,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
     await peer.setLocalDescription(description);
     socket.emit('call:signal', {
       callId: match.callId,
-      signal: { type: 'description', description: peer.localDescription.toJSON() },
+      signal: { type: 'description', description: peer.localDescription.toJSON() }
     });
   }, [match.callId, socket]);
 
@@ -126,7 +127,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
     const animation = Animated.timing(returnProgress, {
       toValue: 0,
       duration: 10000,
-      useNativeDriver: false,
+      useNativeDriver: false
     });
     animation.start();
     return () => animation.stop();
@@ -134,14 +135,14 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
 
   const prepareCall = async () => {
     if (Platform.OS !== 'web') {
-      setError(isDe ? 'Native Audioanrufe benötigen den nächsten Expo-Build-Schritt.' : 'Native audio calls require the next Expo build step.');
+      setError(localize('Native audio calls require the next Expo build step.'));
       return;
     }
     if (!globalThis.isSecureContext) {
-      setError(
-        isDe
-          ? 'Mikrofonzugriff benötigt HTTPS oder localhost.'
-          : 'Microphone access requires HTTPS or localhost.',
+      setError(localize(
+
+
+        'Microphone access requires HTTPS or localhost.')
       );
       return;
     }
@@ -149,14 +150,14 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
     try {
       setState('preparing');
       setError('');
-      const audio = selectedDeviceId
-        ? { deviceId: { exact: selectedDeviceId } }
-        : true;
+      const audio = selectedDeviceId ?
+      { deviceId: { exact: selectedDeviceId } } :
+      true;
       const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
       streamRef.current = stream;
 
       const peer = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       });
       peerRef.current = peer;
       stream.getTracks().forEach((track) => peer.addTrack(track, stream));
@@ -164,7 +165,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
         if (!candidate) return;
         socket.emit('call:signal', {
           callId: match.callId,
-          signal: { type: 'candidate', candidate: candidate.toJSON() },
+          signal: { type: 'candidate', candidate: candidate.toJSON() }
         });
       };
       peer.ontrack = ({ streams }) => {
@@ -193,7 +194,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
         }
       });
     } catch (mediaError) {
-      setError(mediaError.message || (isDe ? 'Das Mikrofon konnte nicht geöffnet werden.' : 'Could not open the microphone.'));
+      setError(mediaError.message || localize('Could not open the microphone.'));
       setState('failed');
       cleanupMedia();
     }
@@ -225,17 +226,17 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
   };
 
   const statusText = {
-    matched: isDe ? 'Match gefunden. Bestätige, wenn du bereit bist.' : 'Match found. Confirm when you are ready.',
-    preparing: isDe ? 'Mikrofon wird vorbereitet…' : 'Preparing microphone…',
-    waiting: isDe ? 'Warte darauf, dass dein Partner startet…' : 'Waiting for your partner to start…',
-    connecting: isDe ? 'Audioverbindung wird aufgebaut…' : 'Connecting audio…',
-    active: isDe ? 'Audioanruf verbunden' : 'Audio call connected',
-    failed: isDe ? 'Der Audioanruf konnte nicht verbunden werden.' : 'The audio call could not connect.',
-    ended: remoteEnd
-      ? remoteEnd.reason === 'user-ended'
-        ? (isDe ? `Getrennt: ${remoteEnd.endedBy || 'Nutzer'} hat den Anruf beendet.` : `Disconnected: ${remoteEnd.endedBy || 'User'} ended the call.`)
-        : (isDe ? 'Getrennt: Dein Partner hat die Verbindung verloren.' : 'Disconnected: Your partner lost the connection.')
-      : (isDe ? 'Anruf beendet' : 'Call ended'),
+    matched: localize('Match found. Confirm when you are ready.'),
+    preparing: localize('Preparing microphone…'),
+    waiting: localize('Waiting for your partner to start…'),
+    connecting: localize('Connecting audio…'),
+    active: localize('Audio call connected'),
+    failed: localize('The audio call could not connect.'),
+    ended: remoteEnd ?
+    remoteEnd.reason === 'user-ended' ? localizeFormat("Disconnected: {0} ended the call.", [
+    remoteEnd.endedBy || 'User']) : localize(
+      'Disconnected: Your partner lost the connection.') : localize(
+      'Call ended')
   }[state];
 
   return (
@@ -245,7 +246,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
           <Text style={styles.avatarText}>{match.partner.name.slice(0, 1).toUpperCase()}</Text>
         </View>
         <View style={styles.partnerCopy}>
-          <Text style={styles.foundLabel}>{isDe ? 'Partner gefunden' : 'Partner found'}</Text>
+          <Text style={styles.foundLabel}>{localize('Partner found')}</Text>
           <Text style={styles.partnerName}>{match.partner.name}</Text>
           <Text style={styles.status}>{statusText}</Text>
         </View>
@@ -253,85 +254,72 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {state === 'matched' || state === 'failed' ? (
-        <Pressable style={styles.startButton} onPress={prepareCall}>
+      {state === 'matched' || state === 'failed' ?
+      <Pressable style={styles.startButton} onPress={prepareCall}>
           <Ionicons name="call" size={19} color="#155a6a" />
-          <Text style={styles.startButtonText}>{isDe ? 'Ich bin bereit' : "I'm ready"}</Text>
-        </Pressable>
-      ) : null}
+          <Text style={styles.startButtonText}>{localize("I'm ready")}</Text>
+        </Pressable> :
+      null}
 
-      {['preparing', 'waiting', 'connecting'].includes(state) ? (
-        <View style={styles.waitingRow}>
+      {['preparing', 'waiting', 'connecting'].includes(state) ?
+      <View style={styles.waitingRow}>
           <ActivityIndicator size="small" color="#155a6a" />
           <Text style={styles.waitingText}>{statusText}</Text>
-        </View>
-      ) : null}
+        </View> :
+      null}
 
-      {state === 'active' ? (
-        <View style={styles.controls}>
+      {state === 'active' ?
+      <View style={styles.controls}>
           <Pressable style={styles.controlButton} onPress={toggleMute}>
             <Ionicons name={muted ? 'mic-off' : 'mic'} size={21} color={colors.textDark} />
-            <Text style={styles.controlText}>{muted ? (isDe ? 'Stumm' : 'Muted') : (isDe ? 'Mikrofon' : 'Microphone')}</Text>
+            <Text style={styles.controlText}>{muted ? localize('Muted') : localize('Microphone')}</Text>
           </Pressable>
           <Pressable style={styles.endButton} onPress={() => setConfirmEnd(true)}>
             <Ionicons name="call" size={21} color="#fff" />
-            <Text style={styles.endText}>{isDe ? 'Beenden' : 'End'}</Text>
+            <Text style={styles.endText}>{localize('End')}</Text>
           </Pressable>
-        </View>
-      ) : null}
+        </View> :
+      null}
 
-      {state === 'ended' ? (
-        <>
+      {state === 'ended' ?
+      <>
           <Text style={styles.countdownText}>
-            {isDe
-              ? `Automatische Rückkehr in ${returnCountdown} Sekunden.`
-              : `Returning automatically in ${returnCountdown} seconds.`}
+            {localizeFormat("Returning automatically in {0} seconds.", [
+
+          returnCountdown])}
           </Text>
           <Pressable style={styles.doneButton} onPress={() => onFinished({ makeAvailable: true })}>
             <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.doneButtonProgress,
-                {
-                  width: returnProgress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                },
-              ]}
-            />
+            pointerEvents="none"
+            style={[
+            styles.doneButtonProgress,
+            {
+              width: returnProgress.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%']
+              })
+            }]
+            } />
+
             <Text style={styles.doneText}>
-              {isDe ? 'Zurück zum Netzwerk' : 'Back to network'}
+              {localize('Back to network')}
             </Text>
           </Pressable>
-        </>
-      ) : null}
+        </> :
+      null}
 
-      <Modal visible={confirmEnd} transparent animationType="fade" onRequestClose={() => setConfirmEnd(false)}>
-        <View style={styles.confirmBackdrop}>
-          <View style={styles.confirmCard}>
-            <View style={styles.confirmIcon}>
-              <Ionicons name="call" size={24} color="#d9485f" />
-            </View>
-            <Text style={styles.confirmTitle}>{isDe ? 'Anruf beenden?' : 'End this call?'}</Text>
-            <Text style={styles.confirmMessage}>
-              {isDe
-                ? `${match.partner.name} wird darüber informiert, dass du den Anruf beendet hast.`
-                : `${match.partner.name} will be told that you ended the call.`}
-            </Text>
-            <View style={styles.confirmActions}>
-              <Pressable style={styles.keepButton} onPress={() => setConfirmEnd(false)}>
-                <Text style={styles.keepText}>{isDe ? 'Weiterreden' : 'Keep talking'}</Text>
-              </Pressable>
-              <Pressable style={styles.confirmEndButton} onPress={end}>
-                <Text style={styles.confirmEndText}>{isDe ? 'Anruf beenden' : 'End call'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
+      <NestedConfirmDialog
+        visible={confirmEnd}
+        title={localize('End this call?')}
+        message={localizeFormat("{0} will be told that you ended the call.", [match.partner.name])}
+        cancelText={localize('Keep talking')}
+        confirmText={localize('End call')}
+        destructive
+        onCancel={() => setConfirmEnd(false)}
+        onConfirm={end}
+      />
+    </View>);
+
 }
 
 const makeStyles = (colors) => StyleSheet.create({
@@ -366,5 +354,5 @@ const makeStyles = (colors) => StyleSheet.create({
   keepButton: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: colors.border },
   keepText: { color: colors.textDark, fontSize: 12, fontWeight: '800' },
   confirmEndButton: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#d9485f' },
-  confirmEndText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  confirmEndText: { color: '#fff', fontSize: 12, fontWeight: '900' }
 });

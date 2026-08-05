@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { localize } from "../locales";import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
@@ -13,15 +13,15 @@ async function voiceForLanguage(language) {
 
   const voices = await Speech.getAvailableVoicesAsync();
   const matchingVoices = voices.filter((voice) =>
-    voice.language?.toLowerCase().startsWith(prefix),
+  voice.language?.toLowerCase().startsWith(prefix)
   );
   const voice =
-    matchingVoices.find((candidate) =>
-      candidate.language?.toLowerCase().startsWith(language.toLowerCase()),
-    )
-    || matchingVoices.find((candidate) => candidate.quality === 'Enhanced')
-    || matchingVoices[0]
-    || null;
+  matchingVoices.find((candidate) =>
+  candidate.language?.toLowerCase().startsWith(language.toLowerCase())
+  ) ||
+  matchingVoices.find((candidate) => candidate.quality === 'Enhanced') ||
+  matchingVoices[0] ||
+  null;
 
   voiceCache.set(prefix, voice);
   return voice;
@@ -53,7 +53,7 @@ export default function ReadAloudButton({ text, language = 'en-US', compact = fa
         rate: 0.9,
         onDone: () => setSpeaking(false),
         onStopped: () => setSpeaking(false),
-        onError: () => setSpeaking(false),
+        onError: () => setSpeaking(false)
       });
     } catch {
       setSpeaking(false);
@@ -66,26 +66,26 @@ export default function ReadAloudButton({ text, language = 'en-US', compact = fa
       disabled={!text?.trim()}
       hitSlop={8}
       accessibilityRole="button"
-      accessibilityLabel={speaking ? (isDe ? 'Aussprache stoppen' : 'Stop pronunciation') : (isDe ? 'Deutsches Wort vorlesen' : 'Read German word aloud')}
+      accessibilityLabel={speaking ? localize('Stop pronunciation') : localize('Read German word aloud')}
       style={({ pressed }) => [
-        styles.button,
-        compact && styles.buttonCompact,
-        { borderColor: colors.border, backgroundColor: colors.pageBg },
-        pressed && styles.pressed,
-      ]}
-    >
+      styles.button,
+      compact && styles.buttonCompact,
+      { borderColor: colors.border, backgroundColor: colors.pageBg },
+      pressed && styles.pressed]
+      }>
+
       <Ionicons
         name={speaking ? 'stop-circle' : 'volume-high'}
         size={compact ? 17 : 18}
-        color={colors.misc.text}
-      />
-      {!compact ? (
-        <Text style={[styles.label, { color: colors.misc.text }]}>
-          {speaking ? (isDe ? 'Stopp' : 'Stop') : (isDe ? 'Anhören' : 'Listen')}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
+        color={colors.misc.text} />
+
+      {!compact ?
+      <Text style={[styles.label, { color: colors.misc.text }]}>
+          {speaking ? localize('Stop') : localize('Listen')}
+        </Text> :
+      null}
+    </Pressable>);
+
 }
 
 const styles = StyleSheet.create({
@@ -96,17 +96,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: 999
   },
   buttonCompact: {
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 6
   },
   label: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '800'
   },
   pressed: {
-    opacity: 0.65,
-  },
+    opacity: 0.65
+  }
 });

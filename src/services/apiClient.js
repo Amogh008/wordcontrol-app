@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getToken } from './tokenStore';
+import { applyLanguageProfileHeader } from './languageProfileStore';
 
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
@@ -18,5 +19,5 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  return config;
+  return applyLanguageProfileHeader(config);
 });

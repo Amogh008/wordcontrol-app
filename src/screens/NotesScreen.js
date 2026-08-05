@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { localize } from "../locales";import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -8,20 +7,21 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
-} from 'react-native';
+  View } from
+'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import OutlinedButton from '../components/OutlinedButton';
+import { useAppDialog } from '../context/AppDialogContext';
 import {
   addNote,
   deleteNote,
   formatNoteContent,
   getNotes,
-  updateNote,
-} from '../services/notesService';
+  updateNote } from
+'../services/notesService';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
@@ -29,7 +29,7 @@ const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: '
 const noteTitleFont = Platform.select({
   ios: 'AvenirNextCondensed-Bold',
   android: 'sans-serif-condensed',
-  default: 'sans-serif-condensed',
+  default: 'sans-serif-condensed'
 });
 
 const NOTE_PREVIEW_TRUNCATE_LENGTH = 65;
@@ -48,6 +48,7 @@ function formatNoteDate(value, locale) {
 }
 
 export default function NotesScreen() {
+  const dialog = useAppDialog();
   const { colors } = useTheme();
   const { language } = useLanguage();
   const isDe = language === 'de';
@@ -59,6 +60,7 @@ export default function NotesScreen() {
   const [detailNote, setDetailNote] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -73,7 +75,7 @@ export default function NotesScreen() {
       setNotes(fetched);
     } catch (err) {
       const msg = err.response?.data?.error ?? err.message ?? 'Failed to load notes.';
-      Alert.alert(isDe ? 'Fehler' : 'Error', msg);
+      dialog.alert(localize('Error'), msg);
     } finally {
       setLoading(false);
     }
@@ -99,7 +101,7 @@ export default function NotesScreen() {
       setContent(formatted);
     } catch (err) {
       const msg = err.response?.data?.error ?? err.message ?? 'Could not format this note.';
-      Alert.alert(isDe ? 'Formatierung fehlgeschlagen' : 'Formatting failed', msg);
+      dialog.alert(localize('Formatting failed'), msg);
     } finally {
       setFormatting(false);
     }
@@ -121,7 +123,7 @@ export default function NotesScreen() {
       }
     } catch (err) {
       const msg = err.response?.data?.error ?? err.message ?? 'Failed to save note.';
-      Alert.alert(isDe ? 'Fehler' : 'Error', msg);
+      dialog.alert(localize('Error'), msg);
     } finally {
       setSaving(false);
     }
@@ -146,7 +148,7 @@ export default function NotesScreen() {
       await load();
     } catch (err) {
       const msg = err.response?.data?.error ?? err.message ?? 'Failed to delete note.';
-      Alert.alert(isDe ? 'Fehler' : 'Error', msg);
+      setDeleteError(msg);
     } finally {
       setDeleting(false);
     }
@@ -156,22 +158,22 @@ export default function NotesScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          <Text style={styles.titleBold}>{isDe ? 'Meine ' : 'My '}</Text>
-          <Text style={styles.titleItalic}>{isDe ? 'Notizen' : 'Notes'}</Text>
+          <Text style={styles.titleBold}>{localize('My ')}</Text>
+          <Text style={styles.titleItalic}>{localize('Notes')}</Text>
         </Text>
-        <Text style={styles.subtitle}>{isDe ? 'Wichtige Notizen, die du täglich findest.' : 'Keep useful language notes in one place.'}</Text>
+        <Text style={styles.subtitle}>{localize('Keep useful language notes in one place.')}</Text>
       </View>
 
       <View style={styles.tabRow}>
         <Pressable
           style={[styles.tabButton, mode === 'add' ? styles.tabButtonActive : styles.tabButtonInactive]}
-          onPress={() => setMode('add')}
-        >
+          onPress={() => setMode('add')}>
+
           <Text
             numberOfLines={1}
-            style={[styles.tabButtonText, mode === 'add' && styles.tabButtonTextActive]}
-          >
-            {editingId ? (isDe ? 'Notiz bearbeiten' : 'Edit note') : (isDe ? '+ Neue Notiz' : '+ New note')}
+            style={[styles.tabButtonText, mode === 'add' && styles.tabButtonTextActive]}>
+
+            {editingId ? localize('Edit note') : localize('+ New note')}
           </Text>
         </Pressable>
         <Pressable
@@ -179,101 +181,101 @@ export default function NotesScreen() {
           onPress={() => {
             if (editingId) resetForm();
             setMode('list');
-          }}
-        >
+          }}>
+
           <Text
             numberOfLines={1}
-            style={[styles.tabButtonText, mode === 'list' && styles.tabButtonTextActive]}
-          >
-            {isDe ? 'Notizen' : 'Notes'} <Text style={styles.tabBadge}>{notes.length}</Text>
+            style={[styles.tabButtonText, mode === 'list' && styles.tabButtonTextActive]}>
+
+            {localize('Notes')} <Text style={styles.tabBadge}>{notes.length}</Text>
           </Text>
         </Pressable>
       </View>
 
-      {mode === 'add' ? (
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      {mode === 'add' ?
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.formCard}>
-            <Text style={styles.label}>{isDe ? 'TITEL' : 'TITLE'} *</Text>
+            <Text style={styles.label}>{localize('TITLE')}{localize("*")}</Text>
             <TextInput
-              style={styles.input}
-              placeholder={isDe ? 'z. B. Besprechungsnotizen' : 'e.g. Meeting notes'}
-              placeholderTextColor={colors.placeholder}
-              value={title}
-              onChangeText={setTitle}
-            />
+            style={styles.input}
+            placeholder={localize('e.g. Meeting notes')}
+            placeholderTextColor={colors.placeholder}
+            value={title}
+            onChangeText={setTitle} />
 
-            <Text style={styles.label}>{isDe ? 'INHALT' : 'CONTENT'} *</Text>
+
+            <Text style={styles.label}>{localize('CONTENT')}{localize("*")}</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder={isDe ? 'Füge deine Notizen hier ein…' : 'Paste your notes here…'}
-              placeholderTextColor={colors.placeholder}
-              value={content}
-              onChangeText={setContent}
-              multiline
-            />
+            style={[styles.input, styles.textArea]}
+            placeholder={localize('Paste your notes here…')}
+            placeholderTextColor={colors.placeholder}
+            value={content}
+            onChangeText={setContent}
+            multiline />
+
 
             <Pressable
-              style={[styles.autofillButton, (content.trim() === '' || formatting) && styles.autofillButtonDisabled]}
-              onPress={handleFormat}
-              disabled={content.trim() === '' || formatting}
-            >
+            style={[styles.autofillButton, (content.trim() === '' || formatting) && styles.autofillButtonDisabled]}
+            onPress={handleFormat}
+            disabled={content.trim() === '' || formatting}>
+
               <Ionicons name="sparkles" size={15} color={colors.misc.text} />
               <Text style={styles.autofillButtonText}>
-                {formatting ? (isDe ? 'Wird formatiert…' : 'Formatting…') : (isDe ? 'Mit KI formatieren' : 'Format with AI')}
+                {formatting ? localize('Formatting…') : localize('Format with AI')}
               </Text>
             </Pressable>
 
             <View style={styles.actionRow}>
               <OutlinedButton
-                title={saving ? (isDe ? 'Speichern…' : 'Saving…') : editingId ? (isDe ? 'Änderungen speichern' : 'Save changes') : (isDe ? 'Notiz speichern' : 'Save note')}
-                icon="save"
-                tone="success"
-                onPress={handleSave}
-                disabled={!canSave || saving}
-                loading={saving}
-                style={styles.saveButton}
-              />
+              title={saving ? localize('Saving…') : editingId ? localize('Save changes') : localize('Save note')}
+              icon="save"
+              tone="success"
+              onPress={handleSave}
+              disabled={!canSave || saving}
+              loading={saving}
+              style={styles.saveButton} />
+
 
               <Pressable style={styles.clearButton} onPress={resetForm}>
                 <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
-                <Text style={styles.clearButtonText}>{isDe ? 'Leeren' : 'Clear'}</Text>
+                <Text style={styles.clearButtonText}>{localize('Clear')}</Text>
               </Pressable>
             </View>
           </View>
-        </ScrollView>
-      ) : (
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        </ScrollView> :
+
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.listHeaderRow}>
-            <Text style={styles.listHeaderText}>{isDe ? 'GESPEICHERT' : 'SAVED'} ({notes.length})</Text>
+            <Text style={styles.listHeaderText}>{localize('SAVED')}{localize("(")}{notes.length}{localize(")")}</Text>
           </View>
 
-          {loading ? (
-            <Text style={styles.emptyText}>{isDe ? 'Lädt…' : 'Loading…'}</Text>
-          ) : notes.length === 0 ? (
-            <Text style={styles.emptyText}>{isDe ? 'Noch keine Notizen. Füge deine erste Notiz im Tab „Neue Notiz“ hinzu!' : 'No notes yet. Add your first note from the New note tab!'}</Text>
-          ) : (
-            notes.map((note) => (
-              <Pressable
-                key={note.id}
-                style={styles.noteCard}
-                onPress={() => {
-                  setConfirmingDelete(false);
-                  setDetailNote(note);
-                }}
-              >
+          {loading ?
+        <Text style={styles.emptyText}>{localize('Loading…')}</Text> :
+        notes.length === 0 ?
+        <Text style={styles.emptyText}>{localize('No notes yet. Add your first note from the New note tab!')}</Text> :
+
+        notes.map((note) =>
+        <Pressable
+          key={note.id}
+          style={styles.noteCard}
+          onPress={() => {
+            setConfirmingDelete(false);
+            setDetailNote(note);
+          }}>
+
                 <View style={styles.noteCardHeader}>
                   <Text style={styles.noteTitle} numberOfLines={2}>{note.title}</Text>
                   <View style={styles.noteDates}>
-                    <Text style={styles.noteDateText}>{isDe ? 'Erstellt' : 'Created'}: {formatNoteDate(note.createdAt, isDe ? 'de-DE' : 'en-US')}</Text>
-                    <Text style={styles.noteDateText}>{isDe ? 'Bearbeitet' : 'Updated'}: {formatNoteDate(note.updatedAt, isDe ? 'de-DE' : 'en-US')}</Text>
+                    <Text style={styles.noteDateText}>{localize('Created')}{localize(":")}{formatNoteDate(note.createdAt, localize('en-US'))}</Text>
+                    <Text style={styles.noteDateText}>{localize('Updated')}{localize(":")}{formatNoteDate(note.updatedAt, localize('en-US'))}</Text>
                   </View>
                 </View>
                 <Text style={styles.notePreview}>{truncatePreview(note.content)}</Text>
               </Pressable>
-            ))
-          )}
+        )
+        }
         </ScrollView>
-      )}
+      }
 
       <Modal
         visible={!!detailNote}
@@ -282,166 +284,161 @@ export default function NotesScreen() {
         onRequestClose={() => {
           setConfirmingDelete(false);
           setDetailNote(null);
-        }}
-      >
+        }}>
+
         <View style={styles.modalOverlay}>
           <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => {
-            if (!deleting) {
-              setConfirmingDelete(false);
-              setDetailNote(null);
-            }
-          }}
-          />
+            style={styles.modalBackdrop}
+            onPress={() => {}} />
+
           <View style={styles.modalCard}>
-            {detailNote ? (
-              confirmingDelete ? (
-                <>
-                  <Text style={styles.deleteConfirmTitle}>{isDe ? 'Notiz löschen?' : 'Delete note?'}</Text>
+            {detailNote ?
+            confirmingDelete ?
+            <>
+                  <Text style={styles.deleteConfirmTitle}>{localize('Delete note?')}</Text>
                   <Text style={styles.deleteConfirmText}>
-                    {isDe ? 'Diese Notiz wird dauerhaft gelöscht.' : 'This note will be permanently deleted.'}
+                    {deleteError || localize('This note will be permanently deleted.')}
                   </Text>
                   <View style={styles.deleteConfirmActions}>
                     <Pressable
-                      style={styles.deleteCancelButton}
-                      onPress={() => setConfirmingDelete(false)}
-                      disabled={deleting}
-                    >
-                      <Text style={styles.deleteCancelText}>{isDe ? 'Abbrechen' : 'Cancel'}</Text>
+                  style={styles.deleteCancelButton}
+                  onPress={() => { setDeleteError(''); setConfirmingDelete(false); }}
+                  disabled={deleting}>
+
+                      <Text style={styles.deleteCancelText}>{localize('Cancel')}</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.deleteConfirmButton, deleting && styles.deleteButtonDisabled]}
-                      onPress={() => handleDelete(detailNote.id)}
-                      disabled={deleting}
-                    >
+                  style={[styles.deleteConfirmButton, deleting && styles.deleteButtonDisabled]}
+                  onPress={() => handleDelete(detailNote.id)}
+                  disabled={deleting}>
+
                       <Ionicons name="trash" size={18} color="#fff" />
                       <Text style={styles.deleteConfirmButtonText}>
-                        {deleting ? (isDe ? 'Wird gelöscht…' : 'Deleting…') : (isDe ? 'Löschen' : 'Delete')}
+                        {deleting ? localize('Deleting…') : localize('Delete')}
                       </Text>
                     </Pressable>
                   </View>
-                </>
-              ) : (
-                <>
+                </> :
+
+            <>
                 <View style={styles.modalHeaderRow}>
                   <Text style={styles.modalTitle} numberOfLines={2}>{detailNote.title}</Text>
                   <Pressable
-                    onPress={() => handleEdit(detailNote)}
-                    hitSlop={10}
-                    style={{ marginLeft: 20 }}
-                  >
+                  onPress={() => handleEdit(detailNote)}
+                  hitSlop={10}
+                  style={{ marginLeft: 20 }}>
+
                     <Ionicons name="pencil" size={20} color={colors.misc.text} />
                   </Pressable>
                   <Pressable
-                    onPress={() => setConfirmingDelete(true)}
-                    hitSlop={10}
-                    style={{ marginLeft: 16 }}
-                  >
+                  onPress={() => { setDeleteError(''); setConfirmingDelete(true); }}
+                  hitSlop={10}
+                  style={{ marginLeft: 16 }}>
+
                     <Ionicons name="trash" size={22} color={colors.die.text} />
                   </Pressable>
                 </View>
                 <ScrollView
-                  style={styles.modalScroll}
-                  contentContainerStyle={styles.modalScrollContent}
-                  nestedScrollEnabled
-                  showsVerticalScrollIndicator
-                >
+                style={styles.modalScroll}
+                contentContainerStyle={styles.modalScrollContent}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator>
+
                   <Text style={styles.modalContent}>{detailNote.content}</Text>
                 </ScrollView>
                 <Pressable
-                  style={styles.modalCloseButton}
-                  onPress={() => {
-                    setConfirmingDelete(false);
-                    setDetailNote(null);
-                  }}
-                >
-                  <Text style={styles.modalCloseButtonText}>{isDe ? 'Schließen' : 'Close'}</Text>
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  setConfirmingDelete(false);
+                  setDetailNote(null);
+                }}>
+
+                  <Text style={styles.modalCloseButtonText}>{localize('Close')}</Text>
                 </Pressable>
-              </>
-              )
-            ) : null}
+              </> :
+
+            null}
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
-  );
+    </SafeAreaView>);
+
 }
 
 const makeStyles = (colors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.pageBg,
+    backgroundColor: colors.pageBg
   },
   header: {
     backgroundColor: colors.headerBg,
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: 24
   },
   title: {
-    fontSize: 30,
+    fontSize: 30
   },
   titleBold: {
     fontFamily: titleFont,
     fontWeight: '700',
-    color: '#fff',
+    color: '#fff'
   },
   titleItalic: {
     fontFamily: titleFont,
     fontStyle: 'italic',
-    color: '#fff',
+    color: '#fff'
   },
   subtitle: {
     marginTop: 6,
     fontSize: 14,
     fontWeight: '600',
-    color: '#cfc9bd',
+    color: '#cfc9bd'
   },
   tabRow: {
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingTop: 16,
-    gap: 10,
+    gap: 10
   },
   tabButton: {
     flex: 1,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1
   },
   tabButtonActive: {
     backgroundColor: colors.headerBg,
-    borderColor: colors.headerBg,
+    borderColor: colors.headerBg
   },
   tabButtonInactive: {
     backgroundColor: colors.cardBg,
-    borderColor: colors.border,
+    borderColor: colors.border
   },
   tabButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.textMuted,
+    color: colors.textMuted
   },
   tabButtonTextActive: {
-    color: '#fff',
+    color: '#fff'
   },
   tabBadge: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   body: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 40
   },
   formCard: {
     backgroundColor: colors.cardBg,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 16,
+    padding: 16
   },
   label: {
     fontSize: 11,
@@ -449,7 +446,7 @@ const makeStyles = (colors) => StyleSheet.create({
     letterSpacing: 0.5,
     color: colors.textMuted,
     marginBottom: 6,
-    marginTop: 4,
+    marginTop: 4
   },
   input: {
     backgroundColor: colors.pageBg,
@@ -460,11 +457,11 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: colors.textDark,
-    marginBottom: 16,
+    marginBottom: 16
   },
   textArea: {
     minHeight: 140,
-    textAlignVertical: 'top',
+    textAlignVertical: 'top'
   },
   autofillButton: {
     flexDirection: 'row',
@@ -476,22 +473,22 @@ const makeStyles = (colors) => StyleSheet.create({
     borderColor: colors.misc.text,
     borderRadius: 10,
     paddingVertical: 11,
-    marginBottom: 16,
+    marginBottom: 16
   },
   autofillButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.5
   },
   autofillButtonText: {
     color: colors.misc.text,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 10
   },
   saveButton: {
-    flex: 1,
+    flex: 1
   },
   clearButton: {
     flexDirection: 'row',
@@ -503,30 +500,30 @@ const makeStyles = (colors) => StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 10,
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 16
   },
   clearButtonText: {
     color: colors.textDark,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   listHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 10
   },
   listHeaderText: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
-    color: colors.textMuted,
+    color: colors.textMuted
   },
   emptyText: {
     marginTop: 20,
     textAlign: 'center',
     color: colors.textMuted,
     fontSize: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: 20
   },
   noteCard: {
     backgroundColor: colors.cardBg,
@@ -534,13 +531,13 @@ const makeStyles = (colors) => StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 12,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 10
   },
   noteCardHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 4
   },
   noteTitle: {
     flex: 1,
@@ -548,30 +545,30 @@ const makeStyles = (colors) => StyleSheet.create({
     fontSize: 32,
     fontWeight: '800',
     color: colors.textDark,
-    marginRight: 12,
+    marginRight: 12
   },
   noteDates: {
-    alignItems: 'flex-end',
+    alignItems: 'flex-end'
   },
   noteDateText: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.textMuted,
+    color: colors.textMuted
   },
   notePreview: {
     fontSize: 14,
     color: colors.textMuted,
-    lineHeight: 20,
+    lineHeight: 20
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.78)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 24
   },
   modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFillObject
   },
   modalCard: {
     backgroundColor: colors.cardBg,
@@ -579,57 +576,57 @@ const makeStyles = (colors) => StyleSheet.create({
     padding: 20,
     width: '100%',
     maxWidth: 420,
-    maxHeight: '80%',
+    maxHeight: '80%'
   },
   modalHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'flex-start'
   },
   modalTitle: {
     flex: 1,
     fontSize: 20,
     fontWeight: '900',
-    color: colors.textDark,
+    color: colors.textDark
   },
   modalScroll: {
     flexShrink: 1,
-    marginTop: 12,
+    marginTop: 12
   },
   modalScrollContent: {
-    paddingBottom: 4,
+    paddingBottom: 4
   },
   modalContent: {
     fontSize: 15,
     color: colors.textDark,
-    lineHeight: 22,
+    lineHeight: 22
   },
   modalCloseButton: {
     marginTop: 16,
     backgroundColor: colors.headerBg,
     borderRadius: 10,
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: 'center'
   },
   modalCloseButtonText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   deleteConfirmTitle: {
     color: colors.textDark,
     fontSize: 21,
-    fontWeight: '900',
+    fontWeight: '900'
   },
   deleteConfirmText: {
     marginTop: 8,
     color: colors.textMuted,
     fontSize: 15,
-    lineHeight: 21,
+    lineHeight: 21
   },
   deleteConfirmActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 22,
+    marginTop: 22
   },
   deleteCancelButton: {
     flex: 1,
@@ -638,12 +635,12 @@ const makeStyles = (colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 12
   },
   deleteCancelText: {
     color: colors.textDark,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '700'
   },
   deleteConfirmButton: {
     flex: 1,
@@ -653,14 +650,14 @@ const makeStyles = (colors) => StyleSheet.create({
     gap: 7,
     borderRadius: 10,
     paddingVertical: 12,
-    backgroundColor: colors.die.text,
+    backgroundColor: colors.die.text
   },
   deleteButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   deleteConfirmButtonText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '800',
-  },
+    fontWeight: '800'
+  }
 });

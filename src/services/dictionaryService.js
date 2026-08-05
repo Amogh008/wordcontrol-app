@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './apiClient';
 import { getToken } from './tokenStore';
 import axios from 'axios';
+import { applyLanguageProfileHeader } from './languageProfileStore';
 
 const dictionaryClient = axios.create({
   baseURL: `${API_BASE_URL}/api/dictionary`,
@@ -9,15 +10,10 @@ const dictionaryClient = axios.create({
 dictionaryClient.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+  return applyLanguageProfileHeader(config);
 });
 
-export async function searchDictionary(query) {
-  const { data } = await dictionaryClient.get('/search', { params: { q: query } });
-  return data.words;
-}
-
-export async function getDictionaryEntry(word) {
-  const { data } = await dictionaryClient.get('/entry', { params: { word } });
+export async function getDictionaryEntry(word, interfaceLanguage = 'en') {
+  const { data } = await dictionaryClient.get('/entry', { params: { word, interfaceLanguage } });
   return data;
 }
