@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import NestedConfirmDialog from './NestedConfirmDialog';
+import { createCallE2EEContext, isCallE2EESupported } from '../services/callE2EE';
 
 export default function WebAudioCall({ socket, match, selectedDeviceId, onFinished }) {
   const { colors } = useTheme();
@@ -14,6 +15,9 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
   const streamRef = useRef(null);
   const audioElementRef = useRef(null);
   const pendingCandidatesRef = useRef([]);
+  const e2eeRef = useRef(null);
+  const readySentRef = useRef(false);
+  const e2eeTimerRef = useRef(null);
   const returnProgress = useRef(new Animated.Value(1)).current;
   const transferStartedRef = useRef(false);
   const [state, setState] = useState('matched');
@@ -29,6 +33,11 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     pendingCandidatesRef.current = [];
+    if (e2eeTimerRef.current) clearTimeout(e2eeTimerRef.current);
+    e2eeTimerRef.current = null;
+    e2eeRef.current?.destroy();
+    e2eeRef.current = null;
+    readySentRef.current = false;
     if (audioElementRef.current) {
       audioElementRef.current.srcObject = null;
       audioElementRef.current.remove();
@@ -55,6 +64,35 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
     });
   }, [match.callId, socket]);
 
+  const markEncryptedCallReady = useCallback(() => {
+    if (readySentRef.current) return;
+    readySentRef.current = true;
+    if (e2eeTimerRef.current) clearTimeout(e2eeTimerRef.current);
+    e2eeTimerRef.current = null;
+    setState('waiting');
+    socket.emit('call:ready', { callId: match.callId }, (result) => {
+      if (!result?.ok) {
+        setError(result?.error || 'Call is no longer available.');
+        setState('failed');
+        cleanupMedia();
+      }
+    });
+  }, [cleanupMedia, match.callId, socket]);
+
+  const secureCallWithPartnerKey = useCallback(async (publicKey) => {
+    const context = e2eeRef.current;
+    const peer = peerRef.current;
+    if (!context || !peer) return;
+    await context.acceptRemotePublicKey(publicKey);
+    peer.getSenders().forEach((sender) => {
+      if (sender.track?.kind === 'audio') context.protectSender(sender);
+    });
+    peer.getReceivers().forEach((receiver) => {
+      if (receiver.track?.kind === 'audio') context.protectReceiver(receiver);
+    });
+    markEncryptedCallReady();
+  }, [markEncryptedCallReady]);
+
   useEffect(() => {
     const handleStart = async ({ callId, initiator }) => {
       if (callId !== match.callId || !peerRef.current) return;
@@ -70,24 +108,44 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
     };
 
     const handleSignal = async ({ callId, signal }) => {
-      if (callId !== match.callId || !peerRef.current) return;
+      if (callId !== match.callId || !signal) return;
       try {
+        if (signal.type === 'e2ee-key-request') {
+          if (!e2eeRef.current) return;
+          await secureCallWithPartnerKey(signal.publicKey);
+          socket.emit('call:signal', {
+            callId: match.callId,
+            signal: { type: 'e2ee-key-response', publicKey: e2eeRef.current.localPublicKey }
+          });
+          return;
+        }
+        if (signal.type === 'e2ee-key-response') {
+          await secureCallWithPartnerKey(signal.publicKey);
+          return;
+        }
+
+        const peer = peerRef.current;
+        if (!peer) return;
         if (signal.type === 'description') {
-          await peerRef.current.setRemoteDescription(signal.description);
+          await peer.setRemoteDescription(signal.description);
+          peer.getReceivers().forEach((receiver) => {
+            if (receiver.track?.kind === 'audio') e2eeRef.current?.protectReceiver(receiver);
+          });
           await flushCandidates();
           if (signal.description.type === 'offer') {
-            await sendDescription(await peerRef.current.createAnswer());
+            await sendDescription(await peer.createAnswer());
           }
         } else if (signal.type === 'candidate' && signal.candidate) {
-          if (peerRef.current.remoteDescription) {
-            await peerRef.current.addIceCandidate(signal.candidate);
+          if (peer.remoteDescription) {
+            await peer.addIceCandidate(signal.candidate);
           } else {
             pendingCandidatesRef.current.push(signal.candidate);
           }
         }
       } catch (signalError) {
-        setError(signalError.message);
+        setError(localize('Could not establish the audio connection.'));
         setState('failed');
+        cleanupMedia();
       }
     };
 
@@ -109,7 +167,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
       socket.emit('call:end', { callId: match.callId });
       cleanupMedia();
     };
-  }, [cleanupMedia, flushCandidates, isDe, match.callId, sendDescription, socket]);
+  }, [cleanupMedia, flushCandidates, isDe, match.callId, secureCallWithPartnerKey, sendDescription, socket]);
 
   useEffect(() => {
     if (state !== 'ended') return undefined;
@@ -146,6 +204,11 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
       );
       return;
     }
+    if (!isCallE2EESupported()) {
+      setError(localize('This browser cannot start audio calls.'));
+      setState('failed');
+      return;
+    }
 
     try {
       setState('preparing');
@@ -155,6 +218,16 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
       true;
       const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
       streamRef.current = stream;
+
+      const e2ee = await createCallE2EEContext({
+        callId: match.callId,
+        onError: () => {
+          setError(localize('The audio connection failed.'));
+          setState('failed');
+          cleanupMedia();
+        },
+      });
+      e2eeRef.current = e2ee;
 
       const peer = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -168,7 +241,14 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
           signal: { type: 'candidate', candidate: candidate.toJSON() }
         });
       };
-      peer.ontrack = ({ streams }) => {
+      peer.ontrack = ({ receiver, streams }) => {
+        try {
+          if (receiver.track?.kind === 'audio') e2eeRef.current?.protectReceiver(receiver);
+        } catch (encryptionError) {
+          setError(encryptionError.message);
+          setState('failed');
+          return;
+        }
         if (!audioElementRef.current) {
           const audio = document.createElement('audio');
           audio.autoplay = true;
@@ -185,14 +265,16 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
         if (['failed', 'disconnected'].includes(peer.connectionState)) setState('failed');
       };
 
-      setState('waiting');
-      socket.emit('call:ready', { callId: match.callId }, (result) => {
-        if (!result?.ok) {
-          setError(result?.error || 'Call is no longer available.');
-          setState('failed');
-          cleanupMedia();
-        }
+      setState('securing');
+      socket.emit('call:signal', {
+        callId: match.callId,
+        signal: { type: 'e2ee-key-request', publicKey: e2ee.localPublicKey }
       });
+      e2eeTimerRef.current = setTimeout(() => {
+        setError(localize('Could not establish the audio connection.'));
+        setState('failed');
+        cleanupMedia();
+      }, 15000);
     } catch (mediaError) {
       setError(mediaError.message || localize('Could not open the microphone.'));
       setState('failed');
@@ -228,6 +310,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
   const statusText = {
     matched: localize('Match found. Confirm when you are ready.'),
     preparing: localize('Preparing microphone…'),
+    securing: localize('Connecting audio…'),
     waiting: localize('Waiting for your partner to start…'),
     connecting: localize('Connecting audio…'),
     active: localize('Audio call connected'),
@@ -261,7 +344,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
         </Pressable> :
       null}
 
-      {['preparing', 'waiting', 'connecting'].includes(state) ?
+      {['preparing', 'securing', 'waiting', 'connecting'].includes(state) ?
       <View style={styles.waitingRow}>
           <ActivityIndicator size="small" color="#155a6a" />
           <Text style={styles.waitingText}>{statusText}</Text>

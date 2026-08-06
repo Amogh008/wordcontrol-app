@@ -2,7 +2,9 @@ import axios from 'axios';
 import { getToken } from './tokenStore';
 import { applyLanguageProfileHeader } from './languageProfileStore';
 
-const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+const configuredApiUrl = (
+  process.env.EXPO_PUBLIC_RUNTIME_API_URL || process.env.EXPO_PUBLIC_API_URL
+)?.trim();
 
 if (!configuredApiUrl) {
   throw new Error('EXPO_PUBLIC_API_URL is required. Set it in the active Expo environment file.');
