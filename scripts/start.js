@@ -5,7 +5,7 @@ const path = require('node:path');
 const args = process.argv.slice(2);
 const modeArgument = args.find((arg) => ['--production', '--dev', '--local'].includes(arg)) || '--production';
 const mode = modeArgument.slice(2);
-const envFile = mode === 'dev' ? '.env.development' : mode === 'local' ? '.env.local' : '.env.production';
+const envFile = mode === 'dev' ? '.env.development' : mode === 'local' ? '.env.localhost' : '.env.production';
 const requestedEnvPath = path.resolve(__dirname, '..', envFile);
 const exampleEnvPath = `${requestedEnvPath}.example`;
 const envPath = fs.existsSync(requestedEnvPath) ? requestedEnvPath : exampleEnvPath;
@@ -35,6 +35,11 @@ if (!selectedEnv.EXPO_PUBLIC_API_URL) {
   process.exit(1);
 }
 
+selectedEnv.EXPO_PUBLIC_RUNTIME_API_URL = selectedEnv.EXPO_PUBLIC_API_URL;
+selectedEnv.EXPO_PUBLIC_RUNTIME_GOOGLE_WEB_CLIENT_ID = selectedEnv.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+selectedEnv.EXPO_PUBLIC_RUNTIME_GOOGLE_IOS_CLIENT_ID = selectedEnv.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
+selectedEnv.EXPO_PUBLIC_RUNTIME_GOOGLE_ANDROID_CLIENT_ID = selectedEnv.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
+
 if (!expoArgs.includes('--clear') && !expoArgs.includes('-c')) {
   expoArgs.push('--clear');
 }
@@ -50,7 +55,11 @@ const expoBin = path.resolve(
 );
 
 const expo = spawn(expoBin, ['start', ...expoArgs], {
-  env: { ...selectedEnv, ...process.env },
+  env: {
+    ...process.env,
+    ...selectedEnv,
+    EXPO_NO_DOTENV: '1',
+  },
   stdio: 'inherit',
 });
 
