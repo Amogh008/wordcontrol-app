@@ -18,7 +18,13 @@
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/icon_wordcontrol.png"
       },
-      "package": "com.amogh.dlt"
+      "package": "com.amogh.dlt",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/icon_wordcontrol.png"
@@ -27,6 +33,8 @@
       "expo-font",
       "expo-secure-store",
       "expo-web-browser",
+      "expo-dev-client",
+      "./plugins/withPcmAudioPlayer.js",
       [
         "expo-splash-screen",
         {

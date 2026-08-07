@@ -595,11 +595,12 @@ const makeStyles = (colors) => StyleSheet.create({
   header: {
     backgroundColor: colors.headerBg,
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 64,
     paddingBottom: 24
   },
   title: {
-    fontSize: 30
+    fontSize: 30,
+    lineHeight: 39
   },
   titleBold: {
     fontFamily: titleFont,
@@ -614,6 +615,7 @@ const makeStyles = (colors) => StyleSheet.create({
   subtitle: {
     marginTop: 6,
     fontSize: 14,
+    lineHeight: 20,
     fontWeight: '600'
   },
   dot: {

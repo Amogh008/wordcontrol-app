@@ -29,8 +29,8 @@ export default function SpeakingNetworkScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24 },
-  title: { color: '#fff', fontFamily: titleFont, fontSize: 30, fontWeight: '700' },
-  subtitle: { marginTop: 6, color: '#cfc9bd', fontSize: 14, fontWeight: '600' },
+  header: { paddingHorizontal: 24, paddingTop: 64, paddingBottom: 24 },
+  title: { color: '#fff', fontFamily: titleFont, fontSize: 30, lineHeight: 39, fontWeight: '700' },
+  subtitle: { marginTop: 6, color: '#cfc9bd', fontSize: 14, lineHeight: 20, fontWeight: '600' },
   body: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
 });

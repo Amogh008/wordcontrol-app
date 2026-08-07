@@ -95,11 +95,11 @@ export default function LanguageLabScreen() {
 
 const makeStyles = (colors) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.pageBg },
-  header: { backgroundColor: colors.headerBg, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24 },
-  title: { fontSize: 30 },
+  header: { backgroundColor: colors.headerBg, paddingHorizontal: 24, paddingTop: 64, paddingBottom: 24 },
+  title: { fontSize: 30, lineHeight: 39 },
   titleBold: { fontFamily: titleFont, fontWeight: '700', color: '#fff' },
   titleItalic: { fontFamily: titleFont, fontStyle: 'italic', color: '#fff' },
-  subtitle: { marginTop: 6, fontSize: 14, fontWeight: '600', color: '#cfc9bd' },
+  subtitle: { marginTop: 6, fontSize: 14, lineHeight: 20, fontWeight: '600', color: '#cfc9bd' },
   menu: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, gap: 14 },
   menuCard: { minHeight: 88, flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.cardBg },
   menuIcon: { width: 50, height: 50, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

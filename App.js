@@ -12,6 +12,7 @@ import SpeakingNetworkScreen from './src/screens/SpeakingNetworkScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import BottomBar from './src/components/BottomBar';
 import { HazySelectButton } from './src/components/HazySelect';
+import OnboardingScreen from './src/components/OnboardingScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LanguageProvider } from './src/context/LanguageContext';
@@ -19,6 +20,8 @@ import { LanguageProfileProvider, useLanguageProfile } from './src/context/Langu
 import { AppDialogProvider } from './src/context/AppDialogContext';
 import { localize } from './src/locales';
 import { languageByCode } from './src/languages';
+import * as preferencesService from './src/services/preferencesService';
+import { rememberOnboarded, wasOnboardedOnThisDevice } from './src/services/onboardingCache';
 
 function TabPanel({ active, children }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -132,7 +135,13 @@ function MainApp() {
         <View style={styles.topFlagCircle}>
           <Text style={styles.topFlagText}>{languageByCode(activeProfile?.language)?.flag}</Text>
         </View>
-        <Text style={[styles.profileButtonText, { color: colors.textDark }]}>{activeProfile?.name || 'Language'}</Text>
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={[styles.profileButtonText, { color: colors.textDark }]}
+        >
+          {activeProfile?.name || 'Language'}
+        </Text>
         <Ionicons name="chevron-down" size={15} color={colors.textDark} />
       </HazySelectButton>
       <Pressable
@@ -312,6 +321,67 @@ function MainApp() {
   );
 }
 
+function OnboardingGate() {
+  const { colors } = useTheme();
+  const { user } = useAuth();
+  const [status, setStatus] = useState('checking'); // 'checking' | 'pending' | 'complete' | 'error'
+  const [retryTick, setRetryTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus('checking');
+    preferencesService.getPreferences()
+      .then((preference) => {
+        if (cancelled) return;
+        if (preference.onboardingCompletedAt) {
+          rememberOnboarded(user.id);
+          setStatus('complete');
+        } else {
+          setStatus('pending');
+        }
+      })
+      .catch(async () => {
+        if (cancelled) return;
+        // Only skip onboarding on a network hiccup if this device has proof this
+        // account already finished it - never guess "complete" for a fresh signup.
+        const previouslyOnboarded = await wasOnboardedOnThisDevice(user.id);
+        if (cancelled) return;
+        setStatus(previouslyOnboarded ? 'complete' : 'error');
+      });
+    return () => { cancelled = true; };
+  }, [user.id, retryTick]);
+
+  if (status === 'checking') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pageBg }}>
+        <ActivityIndicator color={colors.textDark} />
+      </View>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pageBg, padding: 24, gap: 12 }}>
+        <Text style={{ color: colors.textDark, fontSize: 14, fontWeight: '600', textAlign: 'center' }}>
+          {localize("Couldn't load your account. Check your connection and try again.")}
+        </Text>
+        <Pressable
+          style={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: '#bfeefa' }}
+          onPress={() => setRetryTick((n) => n + 1)}
+        >
+          <Text style={{ color: '#155a6a', fontSize: 14, fontWeight: '800' }}>{localize('Retry')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (status === 'pending') {
+    return <OnboardingScreen onComplete={() => { rememberOnboarded(user.id); setStatus('complete'); }} />;
+  }
+
+  return <MainApp />;
+}
+
 function Root() {
   const { user, initializing } = useAuth();
   const { colors } = useTheme();
@@ -326,7 +396,7 @@ function Root() {
 
   return (
     <>
-      {user ? <LanguageProfileProvider><MainApp /></LanguageProfileProvider> : <AuthScreen />}
+      {user ? <LanguageProfileProvider><OnboardingGate /></LanguageProfileProvider> : <AuthScreen />}
       <StatusBar style="light" />
     </>
   );
@@ -376,9 +446,9 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 6,
   },
-  profileButton: { position: 'absolute', right: 66, zIndex: 100, gap: 5, elevation: 6 },
-  profileButtonText: { fontWeight: '700', fontSize: 13 },
-  topFlagCircle: { width: 25, height: 25, overflow: 'hidden', borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eef1f4', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
+  profileButton: { position: 'absolute', right: 66, zIndex: 100, maxWidth: 210, gap: 5, elevation: 6 },
+  profileButtonText: { minWidth: 0, flexShrink: 1, fontWeight: '700', fontSize: 13 },
+  topFlagCircle: { width: 25, height: 25, flexShrink: 0, overflow: 'hidden', borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eef1f4', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
   topFlagText: { fontSize: 16, lineHeight: 21 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.78)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   profileCard: { width: '100%', maxWidth: 420, maxHeight: '78%', borderWidth: 1, borderRadius: 22, padding: 20, gap: 10 },

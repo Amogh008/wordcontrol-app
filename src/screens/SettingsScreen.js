@@ -25,6 +25,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { deleteProfilePhoto, getProfilePhoto, uploadProfilePhoto } from '../services/authService';
 import { useAppDialog } from '../context/AppDialogContext';
 import NestedConfirmDialog from '../components/NestedConfirmDialog';
+import * as Clipboard from 'expo-clipboard';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 const MAX_PHOTO_BYTES = 1024 * 1024;
@@ -85,6 +86,8 @@ export default function SettingsScreen() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [appLanguagePickerOpen, setAppLanguagePickerOpen] = useState(false);
   const [pendingAppLanguage, setPendingAppLanguage] = useState(null);
+  const [userIdCopied, setUserIdCopied] = useState(false);
+  const [userIdRevealed, setUserIdRevealed] = useState(false);
   const selectedAppLanguage = SUPPORTED_LANGUAGES.find((option) => option.code === language) ||
   SUPPORTED_LANGUAGES[0];
   const nextProfileEditAt = user?.profileInfoUpdatedAt ?
@@ -159,6 +162,13 @@ export default function SettingsScreen() {
     }).
     finally(() => setLinkingGoogle(false));
   }, [dialog, googleResponse, linkGoogle, t]);
+
+  const copyUserId = async () => {
+    if (!user?.id) return;
+    await Clipboard.setStringAsync(user.id);
+    setUserIdCopied(true);
+    setTimeout(() => setUserIdCopied(false), 2000);
+  };
 
   const confirmLogout = async () => {
     const confirmed = await dialog.confirm({ title: t('logout'), message: t('logoutQuestion'), confirmText: t('logout'), destructive: true });
@@ -255,6 +265,32 @@ export default function SettingsScreen() {
               <Text style={styles.optionLabel}>{localize("Email")}</Text>
               <Text style={styles.optionValue}>{user?.email || '—'}</Text>
             </View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.optionRow}>
+            <Ionicons name="finger-print-outline" size={20} color={colors.textMuted} />
+            <View style={styles.optionTextWrap}>
+              <Text style={styles.optionLabel}>{localize("User ID")}</Text>
+              <Text style={styles.optionValue} numberOfLines={1}>
+                {user?.id ? (userIdRevealed ? user.id : '•'.repeat(Math.min(user.id.length, 24))) : '—'}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setUserIdRevealed((revealed) => !revealed)}
+              disabled={!user?.id}
+              hitSlop={8}
+              style={styles.copyIdButton}>
+              <Ionicons
+                name={userIdRevealed ? 'eye-off-outline' : 'eye-outline'}
+                size={18}
+                color={colors.textMuted} />
+            </Pressable>
+            <Pressable onPress={copyUserId} disabled={!user?.id} hitSlop={8} style={styles.copyIdButton}>
+              <Ionicons
+                name={userIdCopied ? 'checkmark' : 'copy-outline'}
+                size={18}
+                color={userIdCopied ? '#2f9e44' : colors.textMuted} />
+            </Pressable>
           </View>
           <View style={styles.divider} />
           <View style={styles.optionRow}>
@@ -396,10 +432,10 @@ const makeStyles = (colors) => StyleSheet.create({
   header: {
     backgroundColor: colors.headerBg,
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 64,
     paddingBottom: 24
   },
-  title: { fontSize: 30 },
+  title: { fontSize: 30, lineHeight: 39 },
   titleBold: { fontFamily: titleFont, fontWeight: '700', color: '#fff' },
   titleItalic: { fontFamily: titleFont, fontStyle: 'italic', color: '#fff' },
   content: { padding: 20, paddingBottom: 40 },
@@ -465,6 +501,7 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingVertical: 14
   },
   optionTextWrap: { flex: 1 },
+  copyIdButton: { padding: 6 },
   optionLabel: { fontSize: 13, color: colors.textMuted },
   optionValue: { fontSize: 15, color: colors.textDark, fontWeight: '600', marginTop: 2 },
   appLanguageSelector: { marginTop: 8, paddingHorizontal: 10 },

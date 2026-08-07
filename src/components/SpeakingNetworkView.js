@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View } from
 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { API_BASE_URL } from '../services/apiClient';
 import { createRealtimeConnection } from '../services/realtimeService';
 import MatchmakingModal from './MatchmakingModal';
 import { useLanguageProfile } from '../context/LanguageProfileContext';
+import { sendFriendRequestByUserId } from '../services/friendsService';
 
 export default function SpeakingNetworkView({ onExit }) {
   const { colors } = useTheme();
@@ -33,6 +35,9 @@ export default function SpeakingNetworkView({ onExit }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [matchTimedOut, setMatchTimedOut] = useState(false);
   const [error, setError] = useState('');
+  const [friendIdInput, setFriendIdInput] = useState('');
+  const [sendingFriendRequest, setSendingFriendRequest] = useState(false);
+  const [friendRequestMessage, setFriendRequestMessage] = useState(null);
 
   useEffect(() => {
     const socket = createRealtimeConnection();
@@ -178,15 +183,25 @@ export default function SpeakingNetworkView({ onExit }) {
     }
   };
 
-  const statusLabel = (status) => ({
-    in_call: localize('On call'),
-    matched: localize('Getting ready'),
-    searching: localize('Searching'),
-    available: localize('Ready to practise'),
-    online: localize('Online')
-  })[status] || localize('Online');
+  const sendFriendRequest = async () => {
+    const userId = friendIdInput.trim();
+    if (!userId) return;
+    setSendingFriendRequest(true);
+    setFriendRequestMessage(null);
+    try {
+      await sendFriendRequestByUserId(userId);
+      setFriendRequestMessage({ type: 'success', text: localize('Friend request sent.') });
+      setFriendIdInput('');
+    } catch (requestError) {
+      setFriendRequestMessage({
+        type: 'error',
+        text: requestError.response?.data?.error || localize('Could not send friend request.'),
+      });
+    } finally {
+      setSendingFriendRequest(false);
+    }
+  };
 
-  const others = onlineUsers.filter((onlineUser) => onlineUser.id !== activeProfile?.id);
   const connected = connectionState === 'connected';
 
   return (
@@ -213,7 +228,7 @@ export default function SpeakingNetworkView({ onExit }) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <View style={styles.cardHeadingRow}>
-            <View>
+            <View style={styles.cardHeadingCopy}>
               <Text style={styles.cardTitle}>{localize('Available now')}</Text>
               <Text style={styles.cardSubtitle}>
                 {localize('Others can see that you are ready to practise.')}
@@ -293,47 +308,40 @@ export default function SpeakingNetworkView({ onExit }) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{localize('Now online')}</Text>
-          <Text style={styles.count}>{others.length}</Text>
+          <Text style={styles.sectionTitle}>{localize('Friend search')}</Text>
         </View>
         <View style={styles.card}>
-          {others.length === 0 ?
-          <View style={styles.emptyState}>
-              <Ionicons name="moon-outline" size={24} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>{localize('Nobody available yet')}</Text>
-              <Text style={styles.emptyText}>
-                {localize('Invite a friend or check again later.')}
-              </Text>
-            </View> :
+          <Text style={styles.cardSubtitle}>
+            {localize('Enter a learner’s full user ID to send them a friend request.')}
+          </Text>
+          <View style={styles.friendSearchRow}>
+            <TextInput
+              style={styles.friendSearchInput}
+              value={friendIdInput}
+              onChangeText={(value) => {
+                setFriendIdInput(value);
+                setFriendRequestMessage(null);
+              }}
+              placeholder={localize('User ID')}
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false} />
 
-          others.map((onlineUser, index) =>
-          <View key={onlineUser.id} style={[styles.userRow, index > 0 && styles.userRowBorder]}>
-                <View style={styles.avatar}>
-                  {onlineUser.avatar ?
-              <Image source={{ uri: onlineUser.avatar }} style={styles.avatarImage} /> :
-              <Text style={styles.avatarText}>{onlineUser.name.slice(0, 1).toUpperCase()}</Text>}
-                  {onlineUser.status === 'in_call' ?
-              <View style={styles.callBadge}>
-                      <Ionicons name="call" size={8} color="#fff" />
-                    </View> :
+            <Pressable
+              style={[styles.friendSearchButton, (!friendIdInput.trim() || sendingFriendRequest) && styles.disabled]}
+              onPress={sendFriendRequest}
+              disabled={!friendIdInput.trim() || sendingFriendRequest}>
 
-              <View style={styles.onlineBadge} />
-              }
-                </View>
-                <View style={styles.userCopy}>
-                  <Text style={styles.userName}>{onlineUser.name}</Text>
-                  <Text style={[styles.userStatus, onlineUser.status === 'in_call' && styles.userStatusOnCall]}>
-                    {statusLabel(onlineUser.status)}
-                  </Text>
-                </View>
-                <Ionicons
-              name={onlineUser.status === 'in_call' ? 'call' : 'headset-outline'}
-              size={20}
-              color={onlineUser.status === 'in_call' ? '#e67700' : colors.misc.text} />
-
-              </View>
-          )
-          }
+              {sendingFriendRequest ?
+              <ActivityIndicator size="small" color="#155a6a" /> :
+              <Ionicons name="person-add-outline" size={18} color="#155a6a" />}
+            </Pressable>
+          </View>
+          {friendRequestMessage ?
+          <Text style={friendRequestMessage.type === 'error' ? styles.error : styles.friendRequestSuccess}>
+            {friendRequestMessage.text}
+          </Text> :
+          null}
         </View>
 
         <View style={styles.sectionHeader}>
@@ -376,30 +384,35 @@ const makeStyles = (colors) => StyleSheet.create({
   connectionText: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
   content: { paddingTop: 8, paddingBottom: 32, gap: 14 },
   card: { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 16 },
-  cardHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  cardHeadingRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
+  cardHeadingCopy: { flex: 1, minWidth: 0 },
   cardTitle: { color: colors.textDark, fontSize: 15, fontWeight: '800' },
   cardSubtitle: { marginTop: 3, color: colors.textMuted, fontSize: 12, lineHeight: 17 },
-  elsewhereCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, borderRadius: 13, borderWidth: 1, borderColor: '#e0ad45', backgroundColor: '#fff3bf' },
+  elsewhereCard: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: 13, borderRadius: 13, borderWidth: 1, borderColor: '#e0ad45', backgroundColor: '#fff3bf' },
   elsewhereIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffe8a1' },
-  elsewhereCopy: { flex: 1 },
+  elsewhereCopy: { flex: 1, minWidth: 180 },
   elsewhereTitle: { color: '#704800', fontSize: 12, fontWeight: '900' },
   elsewhereText: { marginTop: 2, color: '#8a5a00', fontSize: 10, lineHeight: 14 },
-  moveButton: { minHeight: 34, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 9, backgroundColor: '#ffd66b' },
+  moveButton: { minHeight: 34, flexShrink: 0, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 9, backgroundColor: '#ffd66b' },
   moveButtonText: { color: '#704800', fontSize: 10, fontWeight: '900' },
-  switchTrack: { width: 48, height: 28, borderRadius: 15, padding: 3, backgroundColor: colors.border },
+  switchTrack: { width: 48, height: 28, flexShrink: 0, borderRadius: 15, padding: 3, backgroundColor: colors.border },
   switchTrackActive: { backgroundColor: '#62d6ee' },
   switchThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
   switchThumbActive: { transform: [{ translateX: 20 }] },
   disabled: { opacity: 0.45 },
   matchButton: { flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 14, padding: 16, backgroundColor: '#bfeefa', borderWidth: 1, borderColor: '#62d6ee' },
   matchButtonSearching: { backgroundColor: '#d9f7fc' },
-  matchCopy: { flex: 1 },
+  matchCopy: { flex: 1, minWidth: 0 },
   matchTitle: { color: '#155a6a', fontSize: 15, fontWeight: '900' },
   matchSubtitle: { marginTop: 3, color: '#397987', fontSize: 12 },
   error: { color: '#c92a2a', fontSize: 12, fontWeight: '600' },
+  friendRequestSuccess: { color: '#2f9e44', fontSize: 12, fontWeight: '600' },
+  friendSearchRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  friendSearchInput: { flex: 1, height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, color: colors.textDark, fontSize: 13 },
+  friendSearchButton: { width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#bfeefa', borderWidth: 1, borderColor: '#62d6ee' },
   sectionHeader: { marginTop: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { color: colors.textDark, fontSize: 16, fontWeight: '800' },
-  count: { color: colors.textMuted, fontSize: 12, fontWeight: '800' },
+  sectionTitle: { flex: 1, minWidth: 0, color: colors.textDark, fontSize: 16, lineHeight: 23, fontWeight: '800' },
+  count: { flexShrink: 0, marginLeft: 12, color: colors.textMuted, fontSize: 12, fontWeight: '800' },
   emptyState: { alignItems: 'center', paddingVertical: 12 },
   emptyTitle: { marginTop: 8, color: colors.textDark, fontSize: 14, fontWeight: '800' },
   emptyText: { marginTop: 4, color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: 'center' },

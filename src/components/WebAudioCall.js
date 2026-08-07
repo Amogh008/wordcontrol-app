@@ -4,22 +4,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import NestedConfirmDialog from './NestedConfirmDialog';
-import { createCallE2EEContext, isCallE2EESupported } from '../services/callE2EE';
+import { createAudioCallCipher } from '../services/audioCipher';
+import { createAudioCallTransport } from '../services/audioTransport';
+
+const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 export default function WebAudioCall({ socket, match, selectedDeviceId, onFinished }) {
   const { colors } = useTheme();
   const { language } = useLanguage();
   const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const peerRef = useRef(null);
-  const streamRef = useRef(null);
-  const audioElementRef = useRef(null);
-  const pendingCandidatesRef = useRef([]);
-  const e2eeRef = useRef(null);
+  const transportRef = useRef(null);
+  const cipherRef = useRef(null);
+  const pendingSignalsRef = useRef([]);
   const readySentRef = useRef(false);
   const e2eeTimerRef = useRef(null);
   const returnProgress = useRef(new Animated.Value(1)).current;
   const transferStartedRef = useRef(false);
+  const audioStartedRef = useRef(false);
+  const mutedRef = useRef(false);
   const [state, setState] = useState('matched');
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState('');
@@ -28,41 +31,18 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
   const [returnCountdown, setReturnCountdown] = useState(10);
 
   const cleanupMedia = useCallback(() => {
-    peerRef.current?.close();
-    peerRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    pendingCandidatesRef.current = [];
+    transportRef.current?.stopCapture();
+    transportRef.current?.stopPlayback();
+    transportRef.current?.close();
+    transportRef.current = null;
+    cipherRef.current?.destroy();
+    cipherRef.current = null;
+    pendingSignalsRef.current = [];
     if (e2eeTimerRef.current) clearTimeout(e2eeTimerRef.current);
     e2eeTimerRef.current = null;
-    e2eeRef.current?.destroy();
-    e2eeRef.current = null;
     readySentRef.current = false;
-    if (audioElementRef.current) {
-      audioElementRef.current.srcObject = null;
-      audioElementRef.current.remove();
-      audioElementRef.current = null;
-    }
+    audioStartedRef.current = false;
   }, []);
-
-  const flushCandidates = useCallback(async () => {
-    const peer = peerRef.current;
-    if (!peer?.remoteDescription) return;
-    const candidates = pendingCandidatesRef.current.splice(0);
-    for (const candidate of candidates) {
-      await peer.addIceCandidate(candidate);
-    }
-  }, []);
-
-  const sendDescription = useCallback(async (description) => {
-    const peer = peerRef.current;
-    if (!peer) return;
-    await peer.setLocalDescription(description);
-    socket.emit('call:signal', {
-      callId: match.callId,
-      signal: { type: 'description', description: peer.localDescription.toJSON() }
-    });
-  }, [match.callId, socket]);
 
   const markEncryptedCallReady = useCallback(() => {
     if (readySentRef.current) return;
@@ -79,31 +59,85 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
     });
   }, [cleanupMedia, match.callId, socket]);
 
-  const secureCallWithPartnerKey = useCallback(async (publicKey) => {
-    const context = e2eeRef.current;
-    const peer = peerRef.current;
-    if (!context || !peer) return;
-    await context.acceptRemotePublicKey(publicKey);
-    peer.getSenders().forEach((sender) => {
-      if (sender.track?.kind === 'audio') context.protectSender(sender);
-    });
-    peer.getReceivers().forEach((receiver) => {
-      if (receiver.track?.kind === 'audio') context.protectReceiver(receiver);
-    });
-    markEncryptedCallReady();
-  }, [markEncryptedCallReady]);
+  const startAudioPipeline = useCallback(async () => {
+    if (audioStartedRef.current) return;
+    audioStartedRef.current = true;
+    const transport = transportRef.current;
+    const cipher = cipherRef.current;
+    if (!transport || !cipher) return;
+    try {
+      await transport.startPlayback();
+      await transport.startCapture(selectedDeviceId, (pcmChunk) => {
+        if (mutedRef.current) return;
+        try {
+          transport.send(cipher.encryptChunk(pcmChunk));
+        } catch (encryptError) {
+          // Drop this chunk; the call keeps running on the next one.
+        }
+      });
+      setState('active');
+    } catch (audioError) {
+      setError(audioError.message || localize('Could not open the microphone.'));
+      setState('failed');
+      cleanupMedia();
+    }
+  }, [cleanupMedia, selectedDeviceId]);
+
+  const applySignal = useCallback((signal) => {
+    const transport = transportRef.current;
+    if (!transport) return;
+    if (signal.type === 'description') {
+      transport.setRemoteDescription(signal.description).then(async () => {
+        if (signal.description.type === 'offer') {
+          const answer = await transport.createAnswer();
+          socket.emit('call:signal', { callId: match.callId, signal: { type: 'description', description: answer } });
+        }
+      }).catch(() => {
+        setError(localize('Could not establish the audio connection.'));
+        setState('failed');
+        cleanupMedia();
+      });
+    } else if (signal.type === 'candidate' && signal.candidate) {
+      transport.addIceCandidate(signal.candidate).catch(() => {});
+    }
+  }, [cleanupMedia, match.callId, socket]);
 
   useEffect(() => {
     const handleStart = async ({ callId, initiator }) => {
-      if (callId !== match.callId || !peerRef.current) return;
+      if (callId !== match.callId || !cipherRef.current) return;
       setState('connecting');
-      if (initiator) {
-        try {
-          await sendDescription(await peerRef.current.createOffer());
-        } catch (startError) {
-          setError(startError.message);
-          setState('failed');
+      try {
+        const transport = await createAudioCallTransport({
+          iceServers: ICE_SERVERS,
+          onIceCandidate: (candidate) => {
+            socket.emit('call:signal', { callId: match.callId, signal: { type: 'candidate', candidate } });
+          },
+          onDataChannelOpen: () => {
+            startAudioPipeline();
+          },
+          onDataChannelMessage: (bytes) => {
+            if (!cipherRef.current) return;
+            try {
+              transportRef.current?.playChunk(cipherRef.current.decryptChunk(bytes));
+            } catch (decryptError) {
+              // Drop this chunk.
+            }
+          },
+          onConnectionStateChange: (connectionState) => {
+            if (['failed', 'disconnected'].includes(connectionState)) setState('failed');
+          },
+        });
+        transportRef.current = transport;
+        transport.isInitiator(initiator);
+        if (initiator) {
+          const offer = await transport.createOffer();
+          socket.emit('call:signal', { callId: match.callId, signal: { type: 'description', description: offer } });
         }
+        const queued = pendingSignalsRef.current.splice(0);
+        queued.forEach(applySignal);
+      } catch (startError) {
+        setError(startError.message);
+        setState('failed');
       }
     };
 
@@ -111,37 +145,26 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
       if (callId !== match.callId || !signal) return;
       try {
         if (signal.type === 'e2ee-key-request') {
-          if (!e2eeRef.current) return;
-          await secureCallWithPartnerKey(signal.publicKey);
+          if (!cipherRef.current) return;
+          cipherRef.current.acceptRemotePublicKey(signal.publicKey);
           socket.emit('call:signal', {
             callId: match.callId,
-            signal: { type: 'e2ee-key-response', publicKey: e2eeRef.current.localPublicKey }
+            signal: { type: 'e2ee-key-response', publicKey: cipherRef.current.localPublicKey }
           });
+          markEncryptedCallReady();
           return;
         }
         if (signal.type === 'e2ee-key-response') {
-          await secureCallWithPartnerKey(signal.publicKey);
+          cipherRef.current?.acceptRemotePublicKey(signal.publicKey);
+          markEncryptedCallReady();
           return;
         }
 
-        const peer = peerRef.current;
-        if (!peer) return;
-        if (signal.type === 'description') {
-          await peer.setRemoteDescription(signal.description);
-          peer.getReceivers().forEach((receiver) => {
-            if (receiver.track?.kind === 'audio') e2eeRef.current?.protectReceiver(receiver);
-          });
-          await flushCandidates();
-          if (signal.description.type === 'offer') {
-            await sendDescription(await peer.createAnswer());
-          }
-        } else if (signal.type === 'candidate' && signal.candidate) {
-          if (peer.remoteDescription) {
-            await peer.addIceCandidate(signal.candidate);
-          } else {
-            pendingCandidatesRef.current.push(signal.candidate);
-          }
+        if (!transportRef.current) {
+          pendingSignalsRef.current.push(signal);
+          return;
         }
+        applySignal(signal);
       } catch (signalError) {
         setError(localize('Could not establish the audio connection.'));
         setState('failed');
@@ -167,7 +190,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
       socket.emit('call:end', { callId: match.callId });
       cleanupMedia();
     };
-  }, [cleanupMedia, flushCandidates, isDe, match.callId, secureCallWithPartnerKey, sendDescription, socket]);
+  }, [applySignal, cleanupMedia, isDe, markEncryptedCallReady, match.callId, socket, startAudioPipeline]);
 
   useEffect(() => {
     if (state !== 'ended') return undefined;
@@ -192,91 +215,29 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
   }, [returnProgress, state]);
 
   const prepareCall = async () => {
-    if (Platform.OS !== 'web') {
-      setError(localize('Native audio calls require the next Expo build step.'));
-      return;
-    }
-    if (!globalThis.isSecureContext) {
-      setError(localize(
-
-
-        'Microphone access requires HTTPS or localhost.')
-      );
-      return;
-    }
-    if (!isCallE2EESupported()) {
-      setError(localize('This browser cannot start audio calls.'));
-      setState('failed');
+    if (Platform.OS === 'web' && !globalThis.isSecureContext) {
+      setError(localize('Microphone access requires HTTPS or localhost.'));
       return;
     }
 
     try {
       setState('preparing');
       setError('');
-      const audio = selectedDeviceId ?
-      { deviceId: { exact: selectedDeviceId } } :
-      true;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
-      streamRef.current = stream;
 
-      const e2ee = await createCallE2EEContext({
-        callId: match.callId,
-        onError: () => {
-          setError(localize('The audio connection failed.'));
-          setState('failed');
-          cleanupMedia();
-        },
-      });
-      e2eeRef.current = e2ee;
-
-      const peer = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-      });
-      peerRef.current = peer;
-      stream.getTracks().forEach((track) => peer.addTrack(track, stream));
-      peer.onicecandidate = ({ candidate }) => {
-        if (!candidate) return;
-        socket.emit('call:signal', {
-          callId: match.callId,
-          signal: { type: 'candidate', candidate: candidate.toJSON() }
-        });
-      };
-      peer.ontrack = ({ receiver, streams }) => {
-        try {
-          if (receiver.track?.kind === 'audio') e2eeRef.current?.protectReceiver(receiver);
-        } catch (encryptionError) {
-          setError(encryptionError.message);
-          setState('failed');
-          return;
-        }
-        if (!audioElementRef.current) {
-          const audio = document.createElement('audio');
-          audio.autoplay = true;
-          audio.playsInline = true;
-          audio.style.display = 'none';
-          document.body.appendChild(audio);
-          audioElementRef.current = audio;
-        }
-        audioElementRef.current.srcObject = streams[0];
-        audioElementRef.current.play().catch(() => {});
-      };
-      peer.onconnectionstatechange = () => {
-        if (peer.connectionState === 'connected') setState('active');
-        if (['failed', 'disconnected'].includes(peer.connectionState)) setState('failed');
-      };
+      cipherRef.current = createAudioCallCipher({ callId: match.callId });
 
       setState('securing');
       socket.emit('call:signal', {
         callId: match.callId,
-        signal: { type: 'e2ee-key-request', publicKey: e2ee.localPublicKey }
+        signal: { type: 'e2ee-key-request', publicKey: cipherRef.current.localPublicKey }
       });
       e2eeTimerRef.current = setTimeout(() => {
         setError(localize('Could not establish the audio connection.'));
         setState('failed');
         cleanupMedia();
       }, 15000);
-    } catch (mediaError) {
-      setError(mediaError.message || localize('Could not open the microphone.'));
+    } catch (prepareError) {
+      setError(prepareError.message || localize('Could not open the microphone.'));
       setState('failed');
       cleanupMedia();
     }
@@ -292,9 +253,7 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
 
   const toggleMute = () => {
     const nextMuted = !muted;
-    streamRef.current?.getAudioTracks().forEach((track) => {
-      track.enabled = !nextMuted;
-    });
+    mutedRef.current = nextMuted;
     setMuted(nextMuted);
   };
 
