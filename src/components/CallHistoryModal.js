@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { localize } from '../locales';
+import { localize, localizeFormat } from '../locales';
 import { useTheme } from '../context/ThemeContext';
+import { useFriendRequests } from '../context/FriendRequestsContext';
 import { getCallHistory } from '../services/callHistoryService';
 import UserProfileDialog from './UserProfileDialog';
 
@@ -28,6 +29,7 @@ export function formatCallDate(value) {
 
 export default function CallHistoryModal({ visible, onClose, refreshToken }) {
   const { colors } = useTheme();
+  const { getFriendStatus } = useFriendRequests();
   const styles = makeStyles(colors);
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -81,26 +83,44 @@ export default function CallHistoryModal({ visible, onClose, refreshToken }) {
               <Text style={styles.emptyText}>{localize('No calls yet.')}</Text>
             ) : (
               calls.map((call) => (
-                <Pressable
-                  key={call.id}
-                  style={styles.callRow}
-                  onPress={() => call.partnerId && setSelectedUser({
-                    accountId: call.partnerId,
-                    name: call.partnerName,
-                    rating: call.partnerRating,
-                    ratingCount: call.partnerRatingCount,
-                    myRating: call.myRating,
-                  })}
-                >
-                  <View style={styles.callIcon}>
+                <View key={call.id} style={styles.callRow}>
+                  <Pressable
+                    style={styles.callIcon}
+                    onPress={() => call.partnerId && setSelectedUser({
+                      accountId: call.partnerId,
+                      name: call.partnerName,
+                      rating: call.partnerRating,
+                      ratingCount: call.partnerRatingCount,
+                    })}
+                  >
                     <Ionicons name="call" size={16} color={colors.misc.text} />
-                  </View>
+                  </Pressable>
                   <View style={styles.callInfo}>
-                    <Text style={styles.callPartner} numberOfLines={1}>{call.partnerName}</Text>
+                    <View style={styles.callPartnerRow}>
+                      <Text style={styles.callPartner} numberOfLines={1}>{call.partnerName}</Text>
+                      {getFriendStatus(call.partnerId) === 'friends' ? (
+                        <View style={styles.friendsPill}>
+                          <Ionicons name="checkmark-circle" size={12} color="#2f9e44" />
+                          <Text style={styles.friendsPillText}>{localize('Friends')}</Text>
+                        </View>
+                      ) : getFriendStatus(call.partnerId) === 'outgoing' ? (
+                        <View style={styles.requestedPill}>
+                          <Ionicons name="paper-plane-outline" size={11} color="#2b8aa0" />
+                          <Text style={styles.requestedPillText}>{localize('Requested')}</Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <Text style={styles.callMeta}>{formatCallDate(call.startedAt)}</Text>
+                    {call.myRating ? (
+                      <View style={styles.myRatingRow}>
+                        <Text style={styles.myRatingText}>{localizeFormat('You rated this {0}', [call.myRating])}</Text>
+                        <Ionicons name="star" size={11} color="#f5b942" />
+                        <Text style={styles.myRatingText}>{localize('for this call')}</Text>
+                      </View>
+                    ) : null}
                   </View>
                   <Text style={styles.callDuration}>{formatDuration(call.durationSeconds)}</Text>
-                </Pressable>
+                </View>
               ))
             )}
           </ScrollView>
@@ -165,7 +185,14 @@ const makeStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.misc.bg,
   },
   callInfo: { flex: 1 },
-  callPartner: { fontSize: 15, fontWeight: '700', color: colors.textDark },
+  callPartnerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  callPartner: { fontSize: 15, fontWeight: '700', color: colors.textDark, flexShrink: 1 },
+  friendsPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(47,158,68,0.12)' },
+  friendsPillText: { color: '#2f9e44', fontSize: 10, fontWeight: '800' },
+  requestedPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(98,214,238,0.16)' },
+  requestedPillText: { color: '#2b8aa0', fontSize: 10, fontWeight: '800' },
   callMeta: { marginTop: 2, fontSize: 12, color: colors.textMuted },
+  myRatingRow: { marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  myRatingText: { fontSize: 11, fontWeight: '700', color: '#9a8a5a' },
   callDuration: { fontSize: 14, fontWeight: '700', color: colors.textDark },
 });

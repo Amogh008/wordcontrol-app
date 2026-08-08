@@ -17,6 +17,7 @@ import { createRealtimeConnection } from '../services/realtimeService';
 import MatchmakingModal from './MatchmakingModal';
 import { useLanguageProfile } from '../context/LanguageProfileContext';
 import { sendFriendRequestByUserId } from '../services/friendsService';
+import { useFriendRequests } from '../context/FriendRequestsContext';
 import ManageFriendsModal from './ManageFriendsModal';
 import CallHistoryModal, { formatCallDate, formatDuration } from './CallHistoryModal';
 import UserProfileDialog from './UserProfileDialog';
@@ -26,6 +27,11 @@ export default function SpeakingNetworkView({ onExit }) {
   const { colors } = useTheme();
   const { language } = useLanguage();
   const { activeProfile } = useLanguageProfile();
+  const { friends: friendsList, getFriendStatus } = useFriendRequests();
+  const friendAccountIds = useMemo(
+    () => new Set(friendsList.map((friend) => friend.id)),
+    [friendsList],
+  );
   const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const socketRef = useRef(null);
@@ -366,20 +372,20 @@ export default function SpeakingNetworkView({ onExit }) {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{localize('Online now')}</Text>
+          <Text style={styles.sectionTitle}>{localize('Online friends')}</Text>
           <Pressable onPress={() => setManageFriendsOpen(true)} style={styles.manageFriendsButton}>
             <Ionicons name="people-circle-outline" size={16} color="#155a6a" />
             <Text style={styles.manageFriendsText}>{localize('Manage friends')}</Text>
           </Pressable>
         </View>
         <View style={styles.card}>
-          {onlineUsers.filter((user) => user.id !== activeProfile?.id).length === 0 ? (
+          {onlineUsers.filter((user) => user.id !== activeProfile?.id && friendAccountIds.has(user.accountId)).length === 0 ? (
             <Text style={styles.emptyText}>
-              {localize('No one else is online right now.')}
+              {localize('None of your friends are online right now.')}
             </Text>
           ) : (
             onlineUsers
-              .filter((user) => user.id !== activeProfile?.id)
+              .filter((user) => user.id !== activeProfile?.id && friendAccountIds.has(user.accountId))
               .map((user, index) => (
                 <Pressable
                   key={user.id}
@@ -422,26 +428,47 @@ export default function SpeakingNetworkView({ onExit }) {
             <Text style={styles.emptyText}>{localize('No calls yet.')}</Text>
           ) : (
             recentCalls.map((call, index) => (
-              <Pressable
+              <View
                 key={call.id}
                 style={[styles.recentCallRow, index === 0 && styles.recentCallRowFirst]}
-                onPress={() => call.partnerId && setSelectedUser({
-                  accountId: call.partnerId,
-                  name: call.partnerName,
-                  rating: call.partnerRating,
-                  ratingCount: call.partnerRatingCount,
-                  myRating: call.myRating,
-                })}
               >
-                <View style={styles.callHistoryIcon}>
+                <Pressable
+                  style={styles.callHistoryIcon}
+                  onPress={() => call.partnerId && setSelectedUser({
+                    accountId: call.partnerId,
+                    name: call.partnerName,
+                    rating: call.partnerRating,
+                    ratingCount: call.partnerRatingCount,
+                  })}
+                >
                   <Ionicons name="call" size={16} color="#155a6a" />
-                </View>
+                </Pressable>
                 <View style={styles.callHistoryCopy}>
-                  <Text style={styles.userName} numberOfLines={1}>{call.partnerName}</Text>
+                  <View style={styles.callPartnerRow}>
+                    <Text style={styles.userName} numberOfLines={1}>{call.partnerName}</Text>
+                    {getFriendStatus(call.partnerId) === 'friends' ? (
+                      <View style={styles.friendsPill}>
+                        <Ionicons name="checkmark-circle" size={12} color="#2f9e44" />
+                        <Text style={styles.friendsPillText}>{localize('Friends')}</Text>
+                      </View>
+                    ) : getFriendStatus(call.partnerId) === 'outgoing' ? (
+                      <View style={styles.requestedPill}>
+                        <Ionicons name="paper-plane-outline" size={11} color="#2b8aa0" />
+                        <Text style={styles.requestedPillText}>{localize('Requested')}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={styles.userStatus}>{formatCallDate(call.startedAt)}</Text>
+                  {call.myRating ? (
+                    <View style={styles.myRatingRow}>
+                      <Text style={styles.myRatingText}>{localizeFormat('You rated this {0}', [call.myRating])}</Text>
+                      <Ionicons name="star" size={11} color="#f5b942" />
+                      <Text style={styles.myRatingText}>{localize('for this call')}</Text>
+                    </View>
+                  ) : null}
                 </View>
                 <Text style={styles.recentCallDuration}>{formatDuration(call.durationSeconds)}</Text>
-              </Pressable>
+              </View>
             ))
           )}
         </View>
@@ -535,5 +562,12 @@ const makeStyles = (colors) => StyleSheet.create({
   userCopy: { flex: 1, marginLeft: 11 },
   userName: { color: colors.textDark, fontSize: 14, fontWeight: '800' },
   userStatus: { marginTop: 2, color: colors.textMuted, fontSize: 11 },
-  userStatusOnCall: { color: '#e67700', fontWeight: '800' }
+  userStatusOnCall: { color: '#e67700', fontWeight: '800' },
+  callPartnerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  friendsPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(47,158,68,0.12)' },
+  friendsPillText: { color: '#2f9e44', fontSize: 10, fontWeight: '800' },
+  requestedPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(98,214,238,0.16)' },
+  requestedPillText: { color: '#2b8aa0', fontSize: 10, fontWeight: '800' },
+  myRatingRow: { marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  myRatingText: { fontSize: 11, fontWeight: '700', color: '#9a8a5a' },
 });

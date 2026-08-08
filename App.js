@@ -3,6 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  useFonts,
+  JetBrainsMono_400Regular,
+  JetBrainsMono_700Bold } from
+'@expo-google-fonts/jetbrains-mono';
 import WordControlScreen from './src/screens/WordControlScreen';
 import NotesScreen from './src/screens/NotesScreen';
 import GamesScreen from './src/screens/GamesScreen';
@@ -25,6 +30,52 @@ import { localize } from './src/locales';
 import { languageByCode } from './src/languages';
 import * as preferencesService from './src/services/preferencesService';
 import { rememberOnboarded, wasOnboardedOnThisDevice } from './src/services/onboardingCache';
+
+// TEMP: trialing app-wide monospace font — revert by deleting this block.
+// (Text.defaultProps no longer works under React 19's automatic JSX transform,
+// so we patch the jsx-runtime instead to inject the font on every <Text>.)
+const monoFontRegular = 'JetBrainsMono_400Regular';
+const monoFontBold = 'JetBrainsMono_700Bold';
+function resolveFontWeight(style, fallback) {
+  if (!style) return fallback;
+  if (Array.isArray(style)) return style.reduce((acc, s) => resolveFontWeight(s, acc), fallback);
+  if (typeof style === 'object' && style.fontWeight != null) return style.fontWeight;
+  return fallback;
+}
+function hasExplicitFontFamily(style) {
+  if (!style) return false;
+  if (Array.isArray(style)) return style.some(hasExplicitFontFamily);
+  return typeof style === 'object' && style.fontFamily != null;
+}
+function monoFamilyForWeight(weight) {
+  if (weight === 'bold') return monoFontBold;
+  if (typeof weight === 'string' && parseInt(weight, 10) >= 700) return monoFontBold;
+  return monoFontRegular;
+}
+function patchJsxForMonoText(mod, exportNames) {
+  if (!mod || mod.__monoPatched) return;
+  mod.__monoPatched = true;
+  exportNames.forEach((name) => {
+    const orig = mod[name];
+    if (typeof orig !== 'function') return;
+    mod[name] = function patched(type, config, ...rest) {
+      // Skip Text elements that already carry their own fontFamily - that's
+      // how icon libraries (e.g. Ionicons) render glyphs, and overriding it
+      // replaces the icon's glyph font with ours, making icons vanish.
+      if (type === Text && config && !hasExplicitFontFamily(config.style)) {
+        const family = monoFamilyForWeight(resolveFontWeight(config.style, 'normal'));
+        // Android resolves fontFamily + a non-"normal" fontWeight as a single
+        // "family-weight" typeface; since we only ship one static file per
+        // weight, that lookup fails and silently falls back to the system
+        // font. Forcing fontWeight: 'normal' last (so it wins) avoids that.
+        config = { ...config, style: [config.style, { fontFamily: family, fontWeight: 'normal' }] };
+      }
+      return orig.call(this, type, config, ...rest);
+    };
+  });
+}
+patchJsxForMonoText(require('react/jsx-runtime'), ['jsx', 'jsxs']);
+patchJsxForMonoText(require('react/jsx-dev-runtime'), ['jsxDEV']);
 
 function TabPanel({ active, children }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -417,6 +468,9 @@ function Root() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({ JetBrainsMono_400Regular, JetBrainsMono_700Bold });
+  if (!fontsLoaded) return null;
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>

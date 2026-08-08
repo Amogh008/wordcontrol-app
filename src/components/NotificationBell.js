@@ -1,16 +1,38 @@
 import { localize } from '../locales';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useFriendRequests } from '../context/FriendRequestsContext';
 import PopIn from './PopIn';
 
+const TOAST_DURATION_MS = 10000;
+
 export default function NotificationBell({ style }) {
   const { colors } = useTheme();
   const { incoming, unreadCount, acceptRequest, rejectRequest } = useFriendRequests();
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [seen, setSeen] = useState(unreadCount === 0);
+  const [toastVisible, setToastVisible] = useState(false);
+  const previousCountRef = useRef(unreadCount);
+  const toastTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (unreadCount > previousCountRef.current) {
+      setSeen(false);
+      setToastVisible(true);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToastVisible(false), TOAST_DURATION_MS);
+    }
+    previousCountRef.current = unreadCount;
+  }, [unreadCount]);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+
+  const unseen = unreadCount > 0 && !seen;
 
   const respond = async (friendId, action) => {
     setBusyId(friendId);
@@ -27,16 +49,27 @@ export default function NotificationBell({ style }) {
   return (
     <>
       <Pressable
-        onPress={() => setOpen(true)}
+        onPress={() => {
+          setOpen(true);
+          setSeen(true);
+        }}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={localize('Friend requests')}
         style={[styles.bellButton, { backgroundColor: colors.cardBg, borderColor: colors.border }, style]}
       >
-        <Ionicons name="notifications-outline" size={20} color={colors.textDark} />
-        {unreadCount > 0 ? (
-          <View style={styles.badge}>
+        <Ionicons name="person-add-outline" size={20} color={colors.textDark} />
+        {unseen ? (
+          <View style={styles.badge} pointerEvents="none">
             <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+          </View>
+        ) : null}
+        {toastVisible ? (
+          <View style={styles.toastWrap} pointerEvents="none">
+            <View style={styles.toastTail} />
+            <View style={styles.toast}>
+              <Text style={styles.toastText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
           </View>
         ) : null}
       </Pressable>
@@ -123,17 +156,56 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
-    paddingHorizontal: 3,
+    top: -5,
+    right: -7,
+    minWidth: 21,
+    height: 21,
+    borderRadius: 11,
+    paddingHorizontal: 5,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#d9485f',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  toastWrap: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    alignItems: 'center',
+  },
+  toastTail: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#d9485f',
+    marginBottom: -1,
+  },
+  toast: {
+    minWidth: 32,
+    height: 22,
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#d9485f',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  toastText: { color: '#fff', fontSize: 11, fontWeight: '900' },
   backdrop: { flex: 1, alignItems: 'flex-end', padding: 14, backgroundColor: 'rgba(4, 12, 18, 0.6)' },
   popInWrap: { width: '100%', maxWidth: 360, maxHeight: '70%', marginTop: 56, alignItems: 'flex-end' },
   sheet: { width: '100%', maxWidth: 360, maxHeight: '100%', borderWidth: 1, borderRadius: 18, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 20 },
