@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { localize } from '../locales';
+import PopIn from './PopIn';
 
 export default function NestedConfirmDialog({ visible, title, message, confirmText, cancelText = localize('Cancel'), destructive = false, loading = false, onCancel, onConfirm }) {
   const { colors } = useTheme();
@@ -10,7 +11,7 @@ export default function NestedConfirmDialog({ visible, title, message, confirmTe
   return (
     <View style={styles.layer} accessibilityViewIsModal>
       <Pressable style={styles.backdrop} onPress={() => {}} />
-      <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+      <PopIn visible={visible} style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
         <View style={styles.heading}>
           <View style={[styles.icon, { backgroundColor: destructive ? 'rgba(201,42,42,0.14)' : 'rgba(98,214,238,0.16)' }]}>
             <Ionicons name={destructive ? 'warning' : 'help-circle'} size={25} color={destructive ? '#c92a2a' : '#2b8aa0'} />
@@ -26,7 +27,7 @@ export default function NestedConfirmDialog({ visible, title, message, confirmTe
             {loading ? <ActivityIndicator size="small" color={destructive ? '#9f1f1f' : '#155a6a'} /> : <Text style={[styles.buttonText, destructive ? styles.dangerText : styles.primaryText]}>{confirmText}</Text>}
           </Pressable>
         </View>
-      </View>
+      </PopIn>
     </View>
   );
 }

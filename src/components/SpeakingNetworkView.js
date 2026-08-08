@@ -17,6 +17,10 @@ import { createRealtimeConnection } from '../services/realtimeService';
 import MatchmakingModal from './MatchmakingModal';
 import { useLanguageProfile } from '../context/LanguageProfileContext';
 import { sendFriendRequestByUserId } from '../services/friendsService';
+import ManageFriendsModal from './ManageFriendsModal';
+import CallHistoryModal, { formatCallDate, formatDuration } from './CallHistoryModal';
+import UserProfileDialog from './UserProfileDialog';
+import { getCallHistory } from '../services/callHistoryService';
 
 export default function SpeakingNetworkView({ onExit }) {
   const { colors } = useTheme();
@@ -38,6 +42,12 @@ export default function SpeakingNetworkView({ onExit }) {
   const [friendIdInput, setFriendIdInput] = useState('');
   const [sendingFriendRequest, setSendingFriendRequest] = useState(false);
   const [friendRequestMessage, setFriendRequestMessage] = useState(null);
+  const [manageFriendsOpen, setManageFriendsOpen] = useState(false);
+  const [callHistoryOpen, setCallHistoryOpen] = useState(false);
+  const [recentCalls, setRecentCalls] = useState([]);
+  const [loadingRecentCalls, setLoadingRecentCalls] = useState(true);
+  const [callsVersion, setCallsVersion] = useState(0);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     const socket = createRealtimeConnection();
@@ -176,12 +186,23 @@ export default function SpeakingNetworkView({ onExit }) {
     setMatch(null);
     setSearchOpen(false);
     setMatchTimedOut(false);
+    setCallsVersion((version) => version + 1);
     if (makeAvailable && socketRef.current?.connected) {
       socketRef.current.emit('presence:set-availability', true, (result) => {
         if (result?.ok) setAvailable(true);
       });
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRecentCalls(true);
+    getCallHistory({ limit: 5 })
+      .then(({ items }) => { if (!cancelled) setRecentCalls(items); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingRecentCalls(false); });
+    return () => { cancelled = true; };
+  }, [callsVersion]);
 
   const sendFriendRequest = async () => {
     const userId = friendIdInput.trim();
@@ -345,17 +366,92 @@ export default function SpeakingNetworkView({ onExit }) {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{localize('Friends online')}</Text>
-          <Text style={styles.count}>{localize("0")}</Text>
+          <Text style={styles.sectionTitle}>{localize('Online now')}</Text>
+          <Pressable onPress={() => setManageFriendsOpen(true)} style={styles.manageFriendsButton}>
+            <Ionicons name="people-circle-outline" size={16} color="#155a6a" />
+            <Text style={styles.manageFriendsText}>{localize('Manage friends')}</Text>
+          </Pressable>
         </View>
         <View style={styles.card}>
-          <Text style={styles.emptyText}>
-            {localize(
+          {onlineUsers.filter((user) => user.id !== activeProfile?.id).length === 0 ? (
+            <Text style={styles.emptyText}>
+              {localize('No one else is online right now.')}
+            </Text>
+          ) : (
+            onlineUsers
+              .filter((user) => user.id !== activeProfile?.id)
+              .map((user, index) => (
+                <Pressable
+                  key={user.id}
+                  style={[styles.userRow, index > 0 && styles.userRowBorder]}
+                  onPress={() => setSelectedUser(user)}
+                >
+                  <View style={styles.avatar}>
+                    {user.avatar ? (
+                      <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
+                    ) : (
+                      <Text style={styles.avatarText}>{(user.name || '?').slice(0, 1).toUpperCase()}</Text>
+                    )}
+                    <View style={styles.onlineBadge} />
+                  </View>
+                  <View style={styles.userCopy}>
+                    <Text style={styles.userName} numberOfLines={1}>{user.name}</Text>
+                    <Text style={[styles.userStatus, user.status === 'in_call' && styles.userStatusOnCall]}>
+                      {user.status === 'in_call' ? localize('In a call') :
+                      user.status === 'matched' ? localize('Connecting…') :
+                      user.status === 'searching' ? localize('Searching for a partner') :
+                      user.status === 'available' ? localize('Available') : localize('Online')}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))
+          )}
+        </View>
 
-              'Friend connections will be enabled after the first successful conversation flow.')}
-          </Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{localize('Call history')}</Text>
+          <Pressable onPress={() => setCallHistoryOpen(true)} style={styles.manageFriendsButton}>
+            <Ionicons name="list-outline" size={16} color="#155a6a" />
+            <Text style={styles.manageFriendsText}>{localize('View all')}</Text>
+          </Pressable>
+        </View>
+        <View style={styles.card}>
+          {loadingRecentCalls ? (
+            <ActivityIndicator color={colors.misc.text} />
+          ) : recentCalls.length === 0 ? (
+            <Text style={styles.emptyText}>{localize('No calls yet.')}</Text>
+          ) : (
+            recentCalls.map((call, index) => (
+              <Pressable
+                key={call.id}
+                style={[styles.recentCallRow, index === 0 && styles.recentCallRowFirst]}
+                onPress={() => call.partnerId && setSelectedUser({ accountId: call.partnerId, name: call.partnerName })}
+              >
+                <View style={styles.callHistoryIcon}>
+                  <Ionicons name="call" size={16} color="#155a6a" />
+                </View>
+                <View style={styles.callHistoryCopy}>
+                  <Text style={styles.userName} numberOfLines={1}>{call.partnerName}</Text>
+                  <Text style={styles.userStatus}>{formatCallDate(call.startedAt)}</Text>
+                </View>
+                <Text style={styles.recentCallDuration}>{formatDuration(call.durationSeconds)}</Text>
+              </Pressable>
+            ))
+          )}
         </View>
       </ScrollView>
+
+      <ManageFriendsModal visible={manageFriendsOpen} onClose={() => setManageFriendsOpen(false)} />
+      <UserProfileDialog
+        visible={Boolean(selectedUser)}
+        onClose={() => setSelectedUser(null)}
+        user={selectedUser}
+      />
+      <CallHistoryModal
+        visible={callHistoryOpen}
+        onClose={() => setCallHistoryOpen(false)}
+        refreshToken={callsVersion}
+      />
 
       <MatchmakingModal
         visible={searchOpen}
@@ -413,6 +509,13 @@ const makeStyles = (colors) => StyleSheet.create({
   sectionHeader: { marginTop: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { flex: 1, minWidth: 0, color: colors.textDark, fontSize: 16, lineHeight: 23, fontWeight: '800' },
   count: { flexShrink: 0, marginLeft: 12, color: colors.textMuted, fontSize: 12, fontWeight: '800' },
+  manageFriendsButton: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 12, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: '#bfeefa', borderWidth: 1, borderColor: '#62d6ee' },
+  manageFriendsText: { color: '#155a6a', fontSize: 11, fontWeight: '900' },
+  callHistoryIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#bfeefa' },
+  callHistoryCopy: { flex: 1, minWidth: 0 },
+  recentCallRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, marginTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  recentCallRowFirst: { paddingTop: 0, marginTop: 0, borderTopWidth: 0 },
+  recentCallDuration: { color: colors.textDark, fontSize: 13, fontWeight: '800' },
   emptyState: { alignItems: 'center', paddingVertical: 12 },
   emptyTitle: { marginTop: 8, color: colors.textDark, fontSize: 14, fontWeight: '800' },
   emptyText: { marginTop: 4, color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: 'center' },

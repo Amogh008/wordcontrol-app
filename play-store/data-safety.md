@@ -19,6 +19,14 @@ submitting the Play Console form.
   dictionary queries, and story vocabulary. Used to provide core app and AI-assisted learning
   features.
 
+### App info and performance / device or other IDs
+
+- **IP address, device/browser user agent, session timestamps:** collected only while online-presence
+  tracking (`SESSION_TRACKING_ENABLED`) is turned on for the backend; currently **off** in production.
+  When on, used to show friend online/offline presence and for connection reliability. Retained for
+  90 days (auto-expiry) and deleted immediately on account deletion. Update this entry before
+  submitting the Play Console form if tracking has been enabled since this was last reviewed.
+
 ## Handling declarations
 
 - Data is transmitted over HTTPS in production.
@@ -27,7 +35,8 @@ submitting the Play Console form.
 - Data is used for app functionality and account management.
 - Some submitted learning text is processed by service providers, including the configured AI
   provider, to return the requested output.
-- Account data can be deleted from inside the app and through the external deletion route.
+- Account data can be deleted from inside the app and through the external deletion route; this
+  also purges session/presence tracking records for the account.
 - Users cannot use the core app anonymously.
 
 ## Service providers to consider

@@ -25,6 +25,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { deleteProfilePhoto, getProfilePhoto, uploadProfilePhoto } from '../services/authService';
 import { useAppDialog } from '../context/AppDialogContext';
 import NestedConfirmDialog from '../components/NestedConfirmDialog';
+import PopIn from '../components/PopIn';
 import * as Clipboard from 'expo-clipboard';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
@@ -249,6 +250,16 @@ export default function SettingsScreen() {
             </View>
           }
           <Text style={styles.email}>{user?.email || t('signedInGoogle')}</Text>
+          {user?.rating ? (
+            <View style={styles.ratingPill}>
+              <Ionicons name="star" size={14} color="#f2b705" />
+              <Text style={styles.ratingPillText}>
+                {user.rating.toFixed(1)} ({user.ratingCount} {user.ratingCount === 1 ? localize('rating') : localize('ratings')})
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.ratingPillEmpty}>{localize('No ratings yet')}</Text>
+          )}
           <Text style={styles.profileCooldown}>
             {profileEditLocked ?
             `Profile information can be changed again on ${nextProfileEditAt.toLocaleDateString()}.` :
@@ -370,7 +381,7 @@ export default function SettingsScreen() {
       </ScrollView>
       <Modal visible={appLanguagePickerOpen} transparent animationType="fade" onRequestClose={() => pendingAppLanguage ? setPendingAppLanguage(null) : setAppLanguagePickerOpen(false)}>
         <Pressable style={styles.languageModalBackdrop} onPress={() => {}}>
-          <Pressable style={styles.languageModalCard} onPress={() => {}}>
+          <PopIn visible={appLanguagePickerOpen} style={styles.languageModalCard}>
             <View style={styles.languageModalTitleRow}>
               <Text style={styles.languageModalTitle}>{localize("App language")}</Text>
               <Pressable onPress={() => setAppLanguagePickerOpen(false)} hitSlop={8} accessibilityLabel="Close language picker">
@@ -400,7 +411,7 @@ export default function SettingsScreen() {
               <Text style={styles.scrollLanguageHintText}>{localize("Scroll for more languages")}</Text>
               <Ionicons name="chevron-down" size={17} color={colors.textMuted} />
             </View>
-          </Pressable>
+          </PopIn>
           <NestedConfirmDialog
             visible={Boolean(pendingAppLanguage)}
             title={localize('Change app language?')}
@@ -413,14 +424,14 @@ export default function SettingsScreen() {
       </Modal>
       <Modal visible={photoViewerOpen} transparent animationType="fade" onRequestClose={() => setPhotoViewerOpen(false)}>
         <Pressable style={styles.photoViewerBackdrop} onPress={() => {}}>
-          <Pressable style={styles.photoViewerCard} onPress={() => {}}>
+          <PopIn visible={photoViewerOpen} style={styles.photoViewerCard}>
             {loadingFullPhoto ?
             <ActivityIndicator size="large" color="#fff" /> :
             fullProfilePhoto ? <Image source={{ uri: fullProfilePhoto }} style={styles.fullProfilePhoto} resizeMode="contain" /> : null}
             <Pressable style={styles.photoViewerClose} onPress={() => setPhotoViewerOpen(false)}>
               <Ionicons name="close" size={24} color="#fff" />
             </Pressable>
-          </Pressable>
+          </PopIn>
         </Pressable>
       </Modal>
     </SafeAreaView>);
@@ -471,6 +482,9 @@ const makeStyles = (colors) => StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   profileCooldown: { maxWidth: 300, marginTop: 8, color: colors.textMuted, fontSize: 11, lineHeight: 16, textAlign: 'center' },
   removePhotoText: { marginTop: 8, color: '#c0392b', fontSize: 12, fontWeight: '700' },
+  ratingPill: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(242,183,5,0.14)' },
+  ratingPillText: { color: '#8a6d00', fontSize: 12, fontWeight: '800' },
+  ratingPillEmpty: { marginTop: 8, color: colors.textMuted, fontSize: 12 },
   profileEditWrap: { width: '100%', paddingHorizontal: 20 },
   profileNameInput: { minHeight: 44, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, color: colors.textDark, backgroundColor: colors.pageBg, fontSize: 16 },
   profileEditActions: { marginTop: 8, flexDirection: 'row', justifyContent: 'center', gap: 8 },

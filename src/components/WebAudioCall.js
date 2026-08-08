@@ -4,8 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import NestedConfirmDialog from './NestedConfirmDialog';
+import UserProfileDialog from './UserProfileDialog';
 import { createAudioCallCipher } from '../services/audioCipher';
 import { createAudioCallTransport } from '../services/audioTransport';
+import { rateCall } from '../services/callHistoryService';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
@@ -29,6 +31,24 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [remoteEnd, setRemoteEnd] = useState(null);
   const [returnCountdown, setReturnCountdown] = useState(10);
+  const [partnerProfileOpen, setPartnerProfileOpen] = useState(false);
+  const [ratingScore, setRatingScore] = useState(0);
+  const [ratingState, setRatingState] = useState('idle'); // idle | sending | sent | error
+  const [ratingError, setRatingError] = useState('');
+
+  const submitRating = useCallback(async (score) => {
+    if (ratingState === 'sending' || ratingState === 'sent') return;
+    setRatingScore(score);
+    setRatingState('sending');
+    setRatingError('');
+    try {
+      await rateCall(match.callId, score);
+      setRatingState('sent');
+    } catch (rateError) {
+      setRatingState('error');
+      setRatingError(rateError.response?.data?.error || localize('Could not submit rating.'));
+    }
+  }, [match.callId, ratingState]);
 
   const cleanupMedia = useCallback(() => {
     transportRef.current?.stopCapture();
@@ -284,14 +304,14 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
   return (
     <View style={styles.card}>
       <View style={styles.partnerRow}>
-        <View style={styles.avatar}>
+        <Pressable style={styles.avatar} onPress={() => setPartnerProfileOpen(true)} hitSlop={4}>
           <Text style={styles.avatarText}>{match.partner.name.slice(0, 1).toUpperCase()}</Text>
-        </View>
-        <View style={styles.partnerCopy}>
+        </Pressable>
+        <Pressable style={styles.partnerCopy} onPress={() => setPartnerProfileOpen(true)}>
           <Text style={styles.foundLabel}>{localize('Partner found')}</Text>
           <Text style={styles.partnerName}>{match.partner.name}</Text>
           <Text style={styles.status}>{statusText}</Text>
-        </View>
+        </Pressable>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -325,6 +345,29 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
 
       {state === 'ended' ?
       <>
+          <View style={styles.ratingBlock}>
+            <Text style={styles.ratingLabel}>
+              {ratingState === 'sent' ? localize('Thanks for rating!') : localize('Rate this call')}
+            </Text>
+            <View style={styles.starRow}>
+              {[1, 2, 3, 4, 5].map((value) => (
+                <Pressable
+                  key={value}
+                  onPress={() => submitRating(value)}
+                  disabled={ratingState === 'sending' || ratingState === 'sent'}
+                  hitSlop={6}
+                >
+                  <Ionicons
+                    name={value <= ratingScore ? 'star' : 'star-outline'}
+                    size={28}
+                    color={value <= ratingScore ? '#f2b705' : colors.textMuted}
+                  />
+                </Pressable>
+              ))}
+            </View>
+            {ratingState === 'error' ? <Text style={styles.error}>{ratingError}</Text> : null}
+          </View>
+
           <Text style={styles.countdownText}>
             {localizeFormat("Returning automatically in {0} seconds.", [
 
@@ -360,6 +403,12 @@ export default function WebAudioCall({ socket, match, selectedDeviceId, onFinish
         onCancel={() => setConfirmEnd(false)}
         onConfirm={end}
       />
+
+      <UserProfileDialog
+        visible={partnerProfileOpen}
+        onClose={() => setPartnerProfileOpen(false)}
+        user={match.partner}
+      />
     </View>);
 
 }
@@ -387,6 +436,9 @@ const makeStyles = (colors) => StyleSheet.create({
   doneButtonProgress: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: '#bfeefa' },
   doneText: { zIndex: 1, color: '#fff', fontSize: 12, fontWeight: '900', textShadowColor: '#000', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 2 },
   countdownText: { marginTop: 12, color: colors.textMuted, fontSize: 11, textAlign: 'center' },
+  ratingBlock: { marginTop: 16, alignItems: 'center' },
+  ratingLabel: { color: colors.textDark, fontSize: 13, fontWeight: '800' },
+  starRow: { marginTop: 8, flexDirection: 'row', gap: 6 },
   confirmBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 22, backgroundColor: 'rgba(4, 12, 18, 0.78)' },
   confirmCard: { width: '100%', maxWidth: 390, alignItems: 'center', padding: 22, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg },
   confirmIcon: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffe3e3' },

@@ -13,7 +13,10 @@ export default function SpeakingNetworkScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.pageBg }]} edges={['top']}>
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
-        <Text style={styles.title}>{localize('My Networks')}</Text>
+        <Text style={styles.title}>
+          <Text style={styles.titleBold}>{localize('My ')}</Text>
+          <Text style={styles.titleItalic}>{localize('Networks')}</Text>
+        </Text>
         <Text style={styles.subtitle}>
           {localizeFormat('Find learning partners, practise {0} and make new connections.', [
             activeProfile?.englishName || 'German',
@@ -30,7 +33,9 @@ export default function SpeakingNetworkScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   header: { paddingHorizontal: 24, paddingTop: 64, paddingBottom: 24 },
-  title: { color: '#fff', fontFamily: titleFont, fontSize: 30, lineHeight: 39, fontWeight: '700' },
+  title: { fontSize: 30, lineHeight: 39 },
+  titleBold: { fontFamily: titleFont, fontWeight: '700', color: '#fff' },
+  titleItalic: { fontFamily: titleFont, fontStyle: 'italic', color: '#fff' },
   subtitle: { marginTop: 6, color: '#cfc9bd', fontSize: 14, lineHeight: 20, fontWeight: '600' },
   body: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
 });

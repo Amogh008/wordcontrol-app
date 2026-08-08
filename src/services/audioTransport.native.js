@@ -1,7 +1,17 @@
-import { NativeModules } from 'react-native';
+import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 import { RTCPeerConnection } from 'react-native-webrtc';
 import AudioRecord from 'react-native-live-audio-stream';
 import { toByteArray, fromByteArray } from 'base64-js';
+
+async function ensureMicrophonePermission() {
+  if (Platform.OS !== 'android') return;
+  const already = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+  if (already) return;
+  const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+  if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+    throw new Error('Microphone permission was denied.');
+  }
+}
 
 export const AUDIO_SAMPLE_RATE = 16000;
 const CAPTURE_CHUNK_BYTES = 1600; // ~50ms of 16-bit mono PCM @ 16kHz
@@ -55,6 +65,7 @@ export async function createAudioCallTransport({ iceServers, onIceCandidate, onD
       if (dataChannel?.readyState === 'open') dataChannel.send(bytes);
     },
     async startCapture(_deviceId, onChunk) {
+      await ensureMicrophonePermission();
       capturing = true;
       AudioRecord.init({
         sampleRate: AUDIO_SAMPLE_RATE,

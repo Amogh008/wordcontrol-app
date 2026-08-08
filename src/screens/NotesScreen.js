@@ -15,6 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import OutlinedButton from '../components/OutlinedButton';
 import { useAppDialog } from '../context/AppDialogContext';
+import PopIn from '../components/PopIn';
 import {
   addNote,
   deleteNote,
@@ -291,7 +292,7 @@ export default function NotesScreen() {
             style={styles.modalBackdrop}
             onPress={() => {}} />
 
-          <View style={styles.modalCard}>
+          <PopIn visible={!!detailNote} style={styles.modalCard}>
             {detailNote ?
             confirmingDelete ?
             <>
@@ -358,7 +359,7 @@ export default function NotesScreen() {
               </> :
 
             null}
-          </View>
+          </PopIn>
         </View>
       </Modal>
     </SafeAreaView>);

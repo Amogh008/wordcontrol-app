@@ -17,7 +17,10 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { LanguageProfileProvider, useLanguageProfile } from './src/context/LanguageProfileContext';
+import { FriendRequestsProvider } from './src/context/FriendRequestsContext';
 import { AppDialogProvider } from './src/context/AppDialogContext';
+import NotificationBell from './src/components/NotificationBell';
+import PopIn from './src/components/PopIn';
 import { localize } from './src/locales';
 import { languageByCode } from './src/languages';
 import * as preferencesService from './src/services/preferencesService';
@@ -144,6 +147,7 @@ function MainApp() {
         </Text>
         <Ionicons name="chevron-down" size={15} color={colors.textDark} />
       </HazySelectButton>
+      <NotificationBell style={{ top: Math.max(insets.top, 8) + 10, right: 64 }} />
       <Pressable
         onPress={toggleSettings}
         hitSlop={8}
@@ -167,6 +171,7 @@ function MainApp() {
       <BottomBar tab={tab} onChange={changeTab} />
       <Modal visible={profilePickerOpen} transparent animationType="fade" presentationStyle="overFullScreen" statusBarTranslucent navigationBarTranslucent hardwareAccelerated onRequestClose={() => profilePendingDelete ? setProfilePendingDelete(null) : setProfilePickerOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => {}}>
+          <PopIn visible={profilePickerOpen} style={styles.modalPopInWrap}>
           <Pressable style={[styles.profileCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]} onPress={() => {}}>
             <View style={styles.modalTitleRow}>
               <Text style={[styles.profileTitle, { color: colors.textDark }]}>Language profile</Text>
@@ -228,10 +233,11 @@ function MainApp() {
               </Text>
             </Pressable>
           </Pressable>
+          </PopIn>
           {profilePendingDelete ? (
             <View style={styles.nestedDialogLayer}>
               <Pressable style={styles.nestedDialogBackdrop} onPress={() => {}} />
-              <View style={[styles.nestedDialogCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              <PopIn visible={Boolean(profilePendingDelete)} style={[styles.nestedDialogCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
                 <View style={styles.nestedDialogHeading}>
                   <View style={styles.nestedDialogIcon}>
                     <Ionicons name="warning" size={25} color="#c92a2a" />
@@ -259,13 +265,14 @@ function MainApp() {
                       : <Text style={[styles.nestedDialogButtonText, styles.nestedDialogDeleteText]}>{localize('Delete profile')}</Text>}
                   </Pressable>
                 </View>
-              </View>
+              </PopIn>
             </View>
           ) : null}
         </Pressable>
       </Modal>
       <Modal visible={languagePickerOpen} transparent animationType="fade" presentationStyle="overFullScreen" statusBarTranslucent navigationBarTranslucent hardwareAccelerated onRequestClose={() => !creatingProfile && setLanguagePickerOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => {}}>
+          <PopIn visible={languagePickerOpen} style={styles.modalPopInWrap}>
           <Pressable style={[styles.profileCard, styles.addLanguageCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]} onPress={() => {}}>
             <View style={styles.modalTitleRow}>
               <Pressable disabled={creatingProfile} onPress={() => { setLanguagePickerOpen(false); setProfilePickerOpen(true); }} hitSlop={8}>
@@ -315,6 +322,7 @@ function MainApp() {
             ) : null}
             {profileError ? <Text style={styles.profileError}>{profileError}</Text> : null}
           </Pressable>
+          </PopIn>
         </Pressable>
       </Modal>
     </View>
@@ -396,7 +404,13 @@ function Root() {
 
   return (
     <>
-      {user ? <LanguageProfileProvider><OnboardingGate /></LanguageProfileProvider> : <AuthScreen />}
+      {user ? (
+        <LanguageProfileProvider>
+          <FriendRequestsProvider>
+            <OnboardingGate />
+          </FriendRequestsProvider>
+        </LanguageProfileProvider>
+      ) : <AuthScreen />}
       <StatusBar style="light" />
     </>
   );
@@ -446,12 +460,13 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 6,
   },
-  profileButton: { position: 'absolute', right: 66, zIndex: 100, maxWidth: 210, gap: 5, elevation: 6 },
+  profileButton: { position: 'absolute', right: 112, zIndex: 100, maxWidth: 164, gap: 5, elevation: 6 },
   profileButtonText: { minWidth: 0, flexShrink: 1, fontWeight: '700', fontSize: 13 },
   topFlagCircle: { width: 25, height: 25, flexShrink: 0, overflow: 'hidden', borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eef1f4', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
   topFlagText: { fontSize: 16, lineHeight: 21 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.78)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  profileCard: { width: '100%', maxWidth: 420, maxHeight: '78%', borderWidth: 1, borderRadius: 22, padding: 20, gap: 10 },
+  modalPopInWrap: { width: '100%', maxWidth: 420, maxHeight: '78%', alignItems: 'center' },
+  profileCard: { width: '100%', maxWidth: 420, maxHeight: '100%', borderWidth: 1, borderRadius: 22, padding: 20, gap: 10 },
   profileTitle: { fontSize: 21, fontWeight: '800', marginBottom: 4 },
   profileRow: { minHeight: 62, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   profileRowSelected: { borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.12)' },
