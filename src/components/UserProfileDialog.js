@@ -6,8 +6,21 @@ import { useTheme } from '../context/ThemeContext';
 import { useFriendRequests } from '../context/FriendRequestsContext';
 import PopIn from './PopIn';
 
-// user: { accountId, name }. accountId is the User document id (not the
-// language-profile id) - it's what the friends API keys off of.
+function StarRow({ value, size = 14 }) {
+  return (
+    <View style={styles.starRow}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Ionicons key={n} name={n <= Math.round(value) ? 'star' : 'star-outline'} size={size} color="#f5b942" />
+      ))}
+    </View>
+  );
+}
+
+// user: { accountId, name, rating, ratingCount, myRating }. accountId is the
+// User document id (not the language-profile id) - it's what the friends API
+// keys off of. rating/ratingCount are that user's overall call rating;
+// myRating is the score the viewer gave them after the call this popup was
+// opened from (if any).
 export default function UserProfileDialog({ visible, onClose, user }) {
   const { colors } = useTheme();
   const { getFriendStatus, sendRequest } = useFriendRequests();
@@ -43,6 +56,26 @@ export default function UserProfileDialog({ visible, onClose, user }) {
               <Text style={styles.avatarText}>{(user.name || '?').slice(0, 1).toUpperCase()}</Text>
             </View>
             <Text style={[styles.name, { color: colors.textDark }]} numberOfLines={1}>{user.name}</Text>
+
+            {user.rating != null ? (
+              <View style={styles.ratingBlock}>
+                <StarRow value={user.rating} />
+                <Text style={[styles.ratingText, { color: colors.textMuted }]}>
+                  {user.rating.toFixed(1)} ({user.ratingCount})
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.ratingText, { color: colors.textMuted, marginTop: 10 }]}>
+                {localize('No ratings yet.')}
+              </Text>
+            )}
+
+            {user.myRating ? (
+              <View style={styles.myRatingBlock}>
+                <Text style={styles.myRatingLabel}>{localize('Your rating for this call')}</Text>
+                <StarRow value={user.myRating} size={12} />
+              </View>
+            ) : null}
 
             {status === 'friends' ? (
               <View style={styles.friendsPill}>
@@ -88,6 +121,11 @@ const styles = StyleSheet.create({
   avatar: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center', backgroundColor: '#bfeefa' },
   avatarText: { color: '#155a6a', fontSize: 26, fontWeight: '900' },
   name: { marginTop: 12, fontSize: 18, fontWeight: '900', maxWidth: '100%' },
+  ratingBlock: { marginTop: 10, alignItems: 'center', gap: 4 },
+  starRow: { flexDirection: 'row', gap: 2 },
+  ratingText: { fontSize: 12, fontWeight: '700' },
+  myRatingBlock: { marginTop: 10, alignItems: 'center', gap: 4 },
+  myRatingLabel: { fontSize: 11, fontWeight: '700', color: '#9a8a5a' },
   friendsPill: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(47,158,68,0.12)' },
   friendsPillText: { color: '#2f9e44', fontSize: 12, fontWeight: '900' },
   pendingPill: { marginTop: 16, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(98,214,238,0.16)' },

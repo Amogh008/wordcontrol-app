@@ -84,7 +84,13 @@ export default function CallHistoryModal({ visible, onClose, refreshToken }) {
                 <Pressable
                   key={call.id}
                   style={styles.callRow}
-                  onPress={() => call.partnerId && setSelectedUser({ accountId: call.partnerId, name: call.partnerName })}
+                  onPress={() => call.partnerId && setSelectedUser({
+                    accountId: call.partnerId,
+                    name: call.partnerName,
+                    rating: call.partnerRating,
+                    ratingCount: call.partnerRatingCount,
+                    myRating: call.myRating,
+                  })}
                 >
                   <View style={styles.callIcon}>
                     <Ionicons name="call" size={16} color={colors.misc.text} />
