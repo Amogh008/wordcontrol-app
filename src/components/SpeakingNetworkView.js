@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View } from
 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,11 +16,22 @@ import { API_BASE_URL } from '../services/apiClient';
 import { createRealtimeConnection } from '../services/realtimeService';
 import MatchmakingModal from './MatchmakingModal';
 import { useLanguageProfile } from '../context/LanguageProfileContext';
+import { sendFriendRequestByUserId } from '../services/friendsService';
+import { useFriendRequests } from '../context/FriendRequestsContext';
+import ManageFriendsModal from './ManageFriendsModal';
+import CallHistoryModal, { formatCallDate, formatDuration } from './CallHistoryModal';
+import UserProfileDialog from './UserProfileDialog';
+import { getCallHistory } from '../services/callHistoryService';
 
 export default function SpeakingNetworkView({ onExit }) {
   const { colors } = useTheme();
   const { language } = useLanguage();
   const { activeProfile } = useLanguageProfile();
+  const { friends: friendsList, getFriendStatus } = useFriendRequests();
+  const friendAccountIds = useMemo(
+    () => new Set(friendsList.map((friend) => friend.id)),
+    [friendsList],
+  );
   const isDe = language === 'de';
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const socketRef = useRef(null);
@@ -33,6 +45,15 @@ export default function SpeakingNetworkView({ onExit }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [matchTimedOut, setMatchTimedOut] = useState(false);
   const [error, setError] = useState('');
+  const [friendIdInput, setFriendIdInput] = useState('');
+  const [sendingFriendRequest, setSendingFriendRequest] = useState(false);
+  const [friendRequestMessage, setFriendRequestMessage] = useState(null);
+  const [manageFriendsOpen, setManageFriendsOpen] = useState(false);
+  const [callHistoryOpen, setCallHistoryOpen] = useState(false);
+  const [recentCalls, setRecentCalls] = useState([]);
+  const [loadingRecentCalls, setLoadingRecentCalls] = useState(true);
+  const [callsVersion, setCallsVersion] = useState(0);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
     const socket = createRealtimeConnection();
@@ -171,6 +192,7 @@ export default function SpeakingNetworkView({ onExit }) {
     setMatch(null);
     setSearchOpen(false);
     setMatchTimedOut(false);
+    setCallsVersion((version) => version + 1);
     if (makeAvailable && socketRef.current?.connected) {
       socketRef.current.emit('presence:set-availability', true, (result) => {
         if (result?.ok) setAvailable(true);
@@ -178,15 +200,35 @@ export default function SpeakingNetworkView({ onExit }) {
     }
   };
 
-  const statusLabel = (status) => ({
-    in_call: localize('On call'),
-    matched: localize('Getting ready'),
-    searching: localize('Searching'),
-    available: localize('Ready to practise'),
-    online: localize('Online')
-  })[status] || localize('Online');
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRecentCalls(true);
+    getCallHistory({ limit: 5 })
+      .then(({ items }) => { if (!cancelled) setRecentCalls(items); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingRecentCalls(false); });
+    return () => { cancelled = true; };
+  }, [callsVersion]);
 
-  const others = onlineUsers.filter((onlineUser) => onlineUser.id !== activeProfile?.id);
+  const sendFriendRequest = async () => {
+    const userId = friendIdInput.trim();
+    if (!userId) return;
+    setSendingFriendRequest(true);
+    setFriendRequestMessage(null);
+    try {
+      await sendFriendRequestByUserId(userId);
+      setFriendRequestMessage({ type: 'success', text: localize('Friend request sent.') });
+      setFriendIdInput('');
+    } catch (requestError) {
+      setFriendRequestMessage({
+        type: 'error',
+        text: requestError.response?.data?.error || localize('Could not send friend request.'),
+      });
+    } finally {
+      setSendingFriendRequest(false);
+    }
+  };
+
   const connected = connectionState === 'connected';
 
   return (
@@ -213,7 +255,7 @@ export default function SpeakingNetworkView({ onExit }) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <View style={styles.cardHeadingRow}>
-            <View>
+            <View style={styles.cardHeadingCopy}>
               <Text style={styles.cardTitle}>{localize('Available now')}</Text>
               <Text style={styles.cardSubtitle}>
                 {localize('Others can see that you are ready to practise.')}
@@ -293,61 +335,156 @@ export default function SpeakingNetworkView({ onExit }) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{localize('Now online')}</Text>
-          <Text style={styles.count}>{others.length}</Text>
+          <Text style={styles.sectionTitle}>{localize('Friend search')}</Text>
         </View>
         <View style={styles.card}>
-          {others.length === 0 ?
-          <View style={styles.emptyState}>
-              <Ionicons name="moon-outline" size={24} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>{localize('Nobody available yet')}</Text>
-              <Text style={styles.emptyText}>
-                {localize('Invite a friend or check again later.')}
-              </Text>
-            </View> :
+          <Text style={styles.cardSubtitle}>
+            {localize('Enter a learner’s full user ID to send them a friend request.')}
+          </Text>
+          <View style={styles.friendSearchRow}>
+            <TextInput
+              style={styles.friendSearchInput}
+              value={friendIdInput}
+              onChangeText={(value) => {
+                setFriendIdInput(value);
+                setFriendRequestMessage(null);
+              }}
+              placeholder={localize('User ID')}
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false} />
 
-          others.map((onlineUser, index) =>
-          <View key={onlineUser.id} style={[styles.userRow, index > 0 && styles.userRowBorder]}>
-                <View style={styles.avatar}>
-                  {onlineUser.avatar ?
-              <Image source={{ uri: onlineUser.avatar }} style={styles.avatarImage} /> :
-              <Text style={styles.avatarText}>{onlineUser.name.slice(0, 1).toUpperCase()}</Text>}
-                  {onlineUser.status === 'in_call' ?
-              <View style={styles.callBadge}>
-                      <Ionicons name="call" size={8} color="#fff" />
-                    </View> :
+            <Pressable
+              style={[styles.friendSearchButton, (!friendIdInput.trim() || sendingFriendRequest) && styles.disabled]}
+              onPress={sendFriendRequest}
+              disabled={!friendIdInput.trim() || sendingFriendRequest}>
 
-              <View style={styles.onlineBadge} />
-              }
-                </View>
-                <View style={styles.userCopy}>
-                  <Text style={styles.userName}>{onlineUser.name}</Text>
-                  <Text style={[styles.userStatus, onlineUser.status === 'in_call' && styles.userStatusOnCall]}>
-                    {statusLabel(onlineUser.status)}
-                  </Text>
-                </View>
-                <Ionicons
-              name={onlineUser.status === 'in_call' ? 'call' : 'headset-outline'}
-              size={20}
-              color={onlineUser.status === 'in_call' ? '#e67700' : colors.misc.text} />
-
-              </View>
-          )
-          }
+              {sendingFriendRequest ?
+              <ActivityIndicator size="small" color="#155a6a" /> :
+              <Ionicons name="person-add-outline" size={18} color="#155a6a" />}
+            </Pressable>
+          </View>
+          {friendRequestMessage ?
+          <Text style={friendRequestMessage.type === 'error' ? styles.error : styles.friendRequestSuccess}>
+            {friendRequestMessage.text}
+          </Text> :
+          null}
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{localize('Friends online')}</Text>
-          <Text style={styles.count}>{localize("0")}</Text>
+          <Text style={styles.sectionTitle}>{localize('Online friends')}</Text>
+          <Pressable onPress={() => setManageFriendsOpen(true)} style={styles.manageFriendsButton}>
+            <Ionicons name="people-circle-outline" size={16} color="#155a6a" />
+            <Text style={styles.manageFriendsText}>{localize('Manage friends')}</Text>
+          </Pressable>
         </View>
         <View style={styles.card}>
-          <Text style={styles.emptyText}>
-            {localize(
+          {onlineUsers.filter((user) => user.id !== activeProfile?.id && friendAccountIds.has(user.accountId)).length === 0 ? (
+            <Text style={styles.emptyText}>
+              {localize('None of your friends are online right now.')}
+            </Text>
+          ) : (
+            onlineUsers
+              .filter((user) => user.id !== activeProfile?.id && friendAccountIds.has(user.accountId))
+              .map((user, index) => (
+                <Pressable
+                  key={user.id}
+                  style={[styles.userRow, index > 0 && styles.userRowBorder]}
+                  onPress={() => setSelectedUser(user)}
+                >
+                  <View style={styles.avatar}>
+                    {user.avatar ? (
+                      <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
+                    ) : (
+                      <Text style={styles.avatarText}>{(user.name || '?').slice(0, 1).toUpperCase()}</Text>
+                    )}
+                    <View style={styles.onlineBadge} />
+                  </View>
+                  <View style={styles.userCopy}>
+                    <Text style={styles.userName} numberOfLines={1}>{user.name}</Text>
+                    <Text style={[styles.userStatus, user.status === 'in_call' && styles.userStatusOnCall]}>
+                      {user.status === 'in_call' ? localize('In a call') :
+                      user.status === 'matched' ? localize('Connecting…') :
+                      user.status === 'searching' ? localize('Searching for a partner') :
+                      user.status === 'available' ? localize('Available') : localize('Online')}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))
+          )}
+        </View>
 
-              'Friend connections will be enabled after the first successful conversation flow.')}
-          </Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{localize('Call history')}</Text>
+          <Pressable onPress={() => setCallHistoryOpen(true)} style={styles.manageFriendsButton}>
+            <Ionicons name="list-outline" size={16} color="#155a6a" />
+            <Text style={styles.manageFriendsText}>{localize('View all')}</Text>
+          </Pressable>
+        </View>
+        <View style={styles.card}>
+          {loadingRecentCalls ? (
+            <ActivityIndicator color={colors.misc.text} />
+          ) : recentCalls.length === 0 ? (
+            <Text style={styles.emptyText}>{localize('No calls yet.')}</Text>
+          ) : (
+            recentCalls.map((call, index) => (
+              <View
+                key={call.id}
+                style={[styles.recentCallRow, index === 0 && styles.recentCallRowFirst]}
+              >
+                <Pressable
+                  style={styles.callHistoryIcon}
+                  onPress={() => call.partnerId && setSelectedUser({
+                    accountId: call.partnerId,
+                    name: call.partnerName,
+                    rating: call.partnerRating,
+                    ratingCount: call.partnerRatingCount,
+                  })}
+                >
+                  <Ionicons name="call" size={16} color="#155a6a" />
+                </Pressable>
+                <View style={styles.callHistoryCopy}>
+                  <View style={styles.callPartnerRow}>
+                    <Text style={styles.userName} numberOfLines={1}>{call.partnerName}</Text>
+                    {getFriendStatus(call.partnerId) === 'friends' ? (
+                      <View style={styles.friendsPill}>
+                        <Ionicons name="checkmark-circle" size={12} color="#2f9e44" />
+                        <Text style={styles.friendsPillText}>{localize('Friends')}</Text>
+                      </View>
+                    ) : getFriendStatus(call.partnerId) === 'outgoing' ? (
+                      <View style={styles.requestedPill}>
+                        <Ionicons name="paper-plane-outline" size={11} color="#2b8aa0" />
+                        <Text style={styles.requestedPillText}>{localize('Requested')}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={styles.userStatus}>{formatCallDate(call.startedAt)}</Text>
+                  {call.myRating ? (
+                    <View style={styles.myRatingRow}>
+                      <Text style={styles.myRatingText}>{localizeFormat('You rated this {0}', [call.myRating])}</Text>
+                      <Ionicons name="star" size={11} color="#f5b942" />
+                      <Text style={styles.myRatingText}>{localize('for this call')}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.recentCallDuration}>{formatDuration(call.durationSeconds)}</Text>
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
+
+      <ManageFriendsModal visible={manageFriendsOpen} onClose={() => setManageFriendsOpen(false)} />
+      <UserProfileDialog
+        visible={Boolean(selectedUser)}
+        onClose={() => setSelectedUser(null)}
+        user={selectedUser}
+      />
+      <CallHistoryModal
+        visible={callHistoryOpen}
+        onClose={() => setCallHistoryOpen(false)}
+        refreshToken={callsVersion}
+      />
 
       <MatchmakingModal
         visible={searchOpen}
@@ -376,30 +513,42 @@ const makeStyles = (colors) => StyleSheet.create({
   connectionText: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
   content: { paddingTop: 8, paddingBottom: 32, gap: 14 },
   card: { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 16 },
-  cardHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  cardHeadingRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
+  cardHeadingCopy: { flex: 1, minWidth: 0 },
   cardTitle: { color: colors.textDark, fontSize: 15, fontWeight: '800' },
   cardSubtitle: { marginTop: 3, color: colors.textMuted, fontSize: 12, lineHeight: 17 },
-  elsewhereCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, borderRadius: 13, borderWidth: 1, borderColor: '#e0ad45', backgroundColor: '#fff3bf' },
+  elsewhereCard: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: 13, borderRadius: 13, borderWidth: 1, borderColor: '#e0ad45', backgroundColor: '#fff3bf' },
   elsewhereIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffe8a1' },
-  elsewhereCopy: { flex: 1 },
+  elsewhereCopy: { flex: 1, minWidth: 180 },
   elsewhereTitle: { color: '#704800', fontSize: 12, fontWeight: '900' },
   elsewhereText: { marginTop: 2, color: '#8a5a00', fontSize: 10, lineHeight: 14 },
-  moveButton: { minHeight: 34, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 9, backgroundColor: '#ffd66b' },
+  moveButton: { minHeight: 34, flexShrink: 0, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 9, backgroundColor: '#ffd66b' },
   moveButtonText: { color: '#704800', fontSize: 10, fontWeight: '900' },
-  switchTrack: { width: 48, height: 28, borderRadius: 15, padding: 3, backgroundColor: colors.border },
+  switchTrack: { width: 48, height: 28, flexShrink: 0, borderRadius: 15, padding: 3, backgroundColor: colors.border },
   switchTrackActive: { backgroundColor: '#62d6ee' },
   switchThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
   switchThumbActive: { transform: [{ translateX: 20 }] },
   disabled: { opacity: 0.45 },
   matchButton: { flexDirection: 'row', alignItems: 'center', gap: 13, borderRadius: 14, padding: 16, backgroundColor: '#bfeefa', borderWidth: 1, borderColor: '#62d6ee' },
   matchButtonSearching: { backgroundColor: '#d9f7fc' },
-  matchCopy: { flex: 1 },
+  matchCopy: { flex: 1, minWidth: 0 },
   matchTitle: { color: '#155a6a', fontSize: 15, fontWeight: '900' },
   matchSubtitle: { marginTop: 3, color: '#397987', fontSize: 12 },
   error: { color: '#c92a2a', fontSize: 12, fontWeight: '600' },
+  friendRequestSuccess: { color: '#2f9e44', fontSize: 12, fontWeight: '600' },
+  friendSearchRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  friendSearchInput: { flex: 1, height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, color: colors.textDark, fontSize: 13 },
+  friendSearchButton: { width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#bfeefa', borderWidth: 1, borderColor: '#62d6ee' },
   sectionHeader: { marginTop: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { color: colors.textDark, fontSize: 16, fontWeight: '800' },
-  count: { color: colors.textMuted, fontSize: 12, fontWeight: '800' },
+  sectionTitle: { flex: 1, minWidth: 0, color: colors.textDark, fontSize: 16, lineHeight: 23, fontWeight: '800' },
+  count: { flexShrink: 0, marginLeft: 12, color: colors.textMuted, fontSize: 12, fontWeight: '800' },
+  manageFriendsButton: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 12, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: '#bfeefa', borderWidth: 1, borderColor: '#62d6ee' },
+  manageFriendsText: { color: '#155a6a', fontSize: 11, fontWeight: '900' },
+  callHistoryIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#bfeefa' },
+  callHistoryCopy: { flex: 1, minWidth: 0 },
+  recentCallRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, marginTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  recentCallRowFirst: { paddingTop: 0, marginTop: 0, borderTopWidth: 0 },
+  recentCallDuration: { color: colors.textDark, fontSize: 13, fontWeight: '800' },
   emptyState: { alignItems: 'center', paddingVertical: 12 },
   emptyTitle: { marginTop: 8, color: colors.textDark, fontSize: 14, fontWeight: '800' },
   emptyText: { marginTop: 4, color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
@@ -413,5 +562,12 @@ const makeStyles = (colors) => StyleSheet.create({
   userCopy: { flex: 1, marginLeft: 11 },
   userName: { color: colors.textDark, fontSize: 14, fontWeight: '800' },
   userStatus: { marginTop: 2, color: colors.textMuted, fontSize: 11 },
-  userStatusOnCall: { color: '#e67700', fontWeight: '800' }
+  userStatusOnCall: { color: '#e67700', fontWeight: '800' },
+  callPartnerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  friendsPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(47,158,68,0.12)' },
+  friendsPillText: { color: '#2f9e44', fontSize: 10, fontWeight: '800' },
+  requestedPill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(98,214,238,0.16)' },
+  requestedPillText: { color: '#2b8aa0', fontSize: 10, fontWeight: '800' },
+  myRatingRow: { marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  myRatingText: { fontSize: 11, fontWeight: '700', color: '#9a8a5a' },
 });

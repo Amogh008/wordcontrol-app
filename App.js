@@ -3,6 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  useFonts,
+  JetBrainsMono_400Regular,
+  JetBrainsMono_700Bold } from
+'@expo-google-fonts/jetbrains-mono';
 import WordControlScreen from './src/screens/WordControlScreen';
 import NotesScreen from './src/screens/NotesScreen';
 import GamesScreen from './src/screens/GamesScreen';
@@ -12,13 +17,65 @@ import SpeakingNetworkScreen from './src/screens/SpeakingNetworkScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import BottomBar from './src/components/BottomBar';
 import { HazySelectButton } from './src/components/HazySelect';
+import OnboardingScreen from './src/components/OnboardingScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { LanguageProfileProvider, useLanguageProfile } from './src/context/LanguageProfileContext';
+import { FriendRequestsProvider } from './src/context/FriendRequestsContext';
 import { AppDialogProvider } from './src/context/AppDialogContext';
+import NotificationBell from './src/components/NotificationBell';
+import PopIn from './src/components/PopIn';
 import { localize } from './src/locales';
 import { languageByCode } from './src/languages';
+import * as preferencesService from './src/services/preferencesService';
+import { rememberOnboarded, wasOnboardedOnThisDevice } from './src/services/onboardingCache';
+
+// TEMP: trialing app-wide monospace font — revert by deleting this block.
+// (Text.defaultProps no longer works under React 19's automatic JSX transform,
+// so we patch the jsx-runtime instead to inject the font on every <Text>.)
+const monoFontRegular = 'JetBrainsMono_400Regular';
+const monoFontBold = 'JetBrainsMono_700Bold';
+function resolveFontWeight(style, fallback) {
+  if (!style) return fallback;
+  if (Array.isArray(style)) return style.reduce((acc, s) => resolveFontWeight(s, acc), fallback);
+  if (typeof style === 'object' && style.fontWeight != null) return style.fontWeight;
+  return fallback;
+}
+function hasExplicitFontFamily(style) {
+  if (!style) return false;
+  if (Array.isArray(style)) return style.some(hasExplicitFontFamily);
+  return typeof style === 'object' && style.fontFamily != null;
+}
+function monoFamilyForWeight(weight) {
+  if (weight === 'bold') return monoFontBold;
+  if (typeof weight === 'string' && parseInt(weight, 10) >= 700) return monoFontBold;
+  return monoFontRegular;
+}
+function patchJsxForMonoText(mod, exportNames) {
+  if (!mod || mod.__monoPatched) return;
+  mod.__monoPatched = true;
+  exportNames.forEach((name) => {
+    const orig = mod[name];
+    if (typeof orig !== 'function') return;
+    mod[name] = function patched(type, config, ...rest) {
+      // Skip Text elements that already carry their own fontFamily - that's
+      // how icon libraries (e.g. Ionicons) render glyphs, and overriding it
+      // replaces the icon's glyph font with ours, making icons vanish.
+      if (type === Text && config && !hasExplicitFontFamily(config.style)) {
+        const family = monoFamilyForWeight(resolveFontWeight(config.style, 'normal'));
+        // Android resolves fontFamily + a non-"normal" fontWeight as a single
+        // "family-weight" typeface; since we only ship one static file per
+        // weight, that lookup fails and silently falls back to the system
+        // font. Forcing fontWeight: 'normal' last (so it wins) avoids that.
+        config = { ...config, style: [config.style, { fontFamily: family, fontWeight: 'normal' }] };
+      }
+      return orig.call(this, type, config, ...rest);
+    };
+  });
+}
+patchJsxForMonoText(require('react/jsx-runtime'), ['jsx', 'jsxs']);
+patchJsxForMonoText(require('react/jsx-dev-runtime'), ['jsxDEV']);
 
 function TabPanel({ active, children }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -132,9 +189,16 @@ function MainApp() {
         <View style={styles.topFlagCircle}>
           <Text style={styles.topFlagText}>{languageByCode(activeProfile?.language)?.flag}</Text>
         </View>
-        <Text style={[styles.profileButtonText, { color: colors.textDark }]}>{activeProfile?.name || 'Language'}</Text>
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={[styles.profileButtonText, { color: colors.textDark }]}
+        >
+          {activeProfile?.name || 'Language'}
+        </Text>
         <Ionicons name="chevron-down" size={15} color={colors.textDark} />
       </HazySelectButton>
+      <NotificationBell style={{ top: Math.max(insets.top, 8) + 10, right: 64 }} />
       <Pressable
         onPress={toggleSettings}
         hitSlop={8}
@@ -158,6 +222,7 @@ function MainApp() {
       <BottomBar tab={tab} onChange={changeTab} />
       <Modal visible={profilePickerOpen} transparent animationType="fade" presentationStyle="overFullScreen" statusBarTranslucent navigationBarTranslucent hardwareAccelerated onRequestClose={() => profilePendingDelete ? setProfilePendingDelete(null) : setProfilePickerOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => {}}>
+          <PopIn visible={profilePickerOpen} style={styles.modalPopInWrap}>
           <Pressable style={[styles.profileCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]} onPress={() => {}}>
             <View style={styles.modalTitleRow}>
               <Text style={[styles.profileTitle, { color: colors.textDark }]}>Language profile</Text>
@@ -219,10 +284,11 @@ function MainApp() {
               </Text>
             </Pressable>
           </Pressable>
+          </PopIn>
           {profilePendingDelete ? (
             <View style={styles.nestedDialogLayer}>
               <Pressable style={styles.nestedDialogBackdrop} onPress={() => {}} />
-              <View style={[styles.nestedDialogCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              <PopIn visible={Boolean(profilePendingDelete)} style={[styles.nestedDialogCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
                 <View style={styles.nestedDialogHeading}>
                   <View style={styles.nestedDialogIcon}>
                     <Ionicons name="warning" size={25} color="#c92a2a" />
@@ -250,13 +316,14 @@ function MainApp() {
                       : <Text style={[styles.nestedDialogButtonText, styles.nestedDialogDeleteText]}>{localize('Delete profile')}</Text>}
                   </Pressable>
                 </View>
-              </View>
+              </PopIn>
             </View>
           ) : null}
         </Pressable>
       </Modal>
       <Modal visible={languagePickerOpen} transparent animationType="fade" presentationStyle="overFullScreen" statusBarTranslucent navigationBarTranslucent hardwareAccelerated onRequestClose={() => !creatingProfile && setLanguagePickerOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => {}}>
+          <PopIn visible={languagePickerOpen} style={styles.modalPopInWrap}>
           <Pressable style={[styles.profileCard, styles.addLanguageCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]} onPress={() => {}}>
             <View style={styles.modalTitleRow}>
               <Pressable disabled={creatingProfile} onPress={() => { setLanguagePickerOpen(false); setProfilePickerOpen(true); }} hitSlop={8}>
@@ -306,10 +373,72 @@ function MainApp() {
             ) : null}
             {profileError ? <Text style={styles.profileError}>{profileError}</Text> : null}
           </Pressable>
+          </PopIn>
         </Pressable>
       </Modal>
     </View>
   );
+}
+
+function OnboardingGate() {
+  const { colors } = useTheme();
+  const { user } = useAuth();
+  const [status, setStatus] = useState('checking'); // 'checking' | 'pending' | 'complete' | 'error'
+  const [retryTick, setRetryTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus('checking');
+    preferencesService.getPreferences()
+      .then((preference) => {
+        if (cancelled) return;
+        if (preference.onboardingCompletedAt) {
+          rememberOnboarded(user.id);
+          setStatus('complete');
+        } else {
+          setStatus('pending');
+        }
+      })
+      .catch(async () => {
+        if (cancelled) return;
+        // Only skip onboarding on a network hiccup if this device has proof this
+        // account already finished it - never guess "complete" for a fresh signup.
+        const previouslyOnboarded = await wasOnboardedOnThisDevice(user.id);
+        if (cancelled) return;
+        setStatus(previouslyOnboarded ? 'complete' : 'error');
+      });
+    return () => { cancelled = true; };
+  }, [user.id, retryTick]);
+
+  if (status === 'checking') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pageBg }}>
+        <ActivityIndicator color={colors.textDark} />
+      </View>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pageBg, padding: 24, gap: 12 }}>
+        <Text style={{ color: colors.textDark, fontSize: 14, fontWeight: '600', textAlign: 'center' }}>
+          {localize("Couldn't load your account. Check your connection and try again.")}
+        </Text>
+        <Pressable
+          style={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: '#bfeefa' }}
+          onPress={() => setRetryTick((n) => n + 1)}
+        >
+          <Text style={{ color: '#155a6a', fontSize: 14, fontWeight: '800' }}>{localize('Retry')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (status === 'pending') {
+    return <OnboardingScreen onComplete={() => { rememberOnboarded(user.id); setStatus('complete'); }} />;
+  }
+
+  return <MainApp />;
 }
 
 function Root() {
@@ -326,13 +455,22 @@ function Root() {
 
   return (
     <>
-      {user ? <LanguageProfileProvider><MainApp /></LanguageProfileProvider> : <AuthScreen />}
+      {user ? (
+        <LanguageProfileProvider>
+          <FriendRequestsProvider>
+            <OnboardingGate />
+          </FriendRequestsProvider>
+        </LanguageProfileProvider>
+      ) : <AuthScreen />}
       <StatusBar style="light" />
     </>
   );
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({ JetBrainsMono_400Regular, JetBrainsMono_700Bold });
+  if (!fontsLoaded) return null;
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
@@ -376,12 +514,13 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 6,
   },
-  profileButton: { position: 'absolute', right: 66, zIndex: 100, gap: 5, elevation: 6 },
-  profileButtonText: { fontWeight: '700', fontSize: 13 },
-  topFlagCircle: { width: 25, height: 25, overflow: 'hidden', borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eef1f4', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
+  profileButton: { position: 'absolute', right: 112, zIndex: 100, maxWidth: 164, gap: 5, elevation: 6 },
+  profileButtonText: { minWidth: 0, flexShrink: 1, fontWeight: '700', fontSize: 13 },
+  topFlagCircle: { width: 25, height: 25, flexShrink: 0, overflow: 'hidden', borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eef1f4', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
   topFlagText: { fontSize: 16, lineHeight: 21 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.78)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  profileCard: { width: '100%', maxWidth: 420, maxHeight: '78%', borderWidth: 1, borderRadius: 22, padding: 20, gap: 10 },
+  modalPopInWrap: { width: '100%', maxWidth: 420, maxHeight: '78%', alignItems: 'center' },
+  profileCard: { width: '100%', maxWidth: 420, maxHeight: '100%', borderWidth: 1, borderRadius: 22, padding: 20, gap: 10 },
   profileTitle: { fontSize: 21, fontWeight: '800', marginBottom: 4 },
   profileRow: { minHeight: 62, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   profileRowSelected: { borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.12)' },

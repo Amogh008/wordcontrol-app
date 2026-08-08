@@ -56,6 +56,11 @@
         <li>Account details such as name, email address, password hash, and Google account link.</li>
         <li>User content such as saved vocabulary, meanings, study notes, and text submitted to learning tools.</li>
         <li>Authentication and security information needed to keep users signed in and verify email addresses.</li>
+        <li>
+          When online-presence tracking is active, connection information for the live study-session
+          features: IP address, device/browser user agent, and session start, end, and duration
+          timestamps, linked to your account ID.
+        </li>
       </ul>
       <p>DLT does not store users’ plain-text passwords.</p>
 
@@ -65,6 +70,10 @@
         <li>To synchronize saved vocabulary and notes across signed-in devices.</li>
         <li>To provide dictionary, translation, grammar, note-formatting, and story features.</li>
         <li>To respond to account deletion and support requests and prevent misuse.</li>
+        <li>
+          To show whether a friend is currently online and to keep the connection to our servers
+          reliable (session/presence tracking).
+        </li>
       </ul>
 
       <h2>Service providers and AI processing</h2>
@@ -84,7 +93,9 @@
       <h2>Retention and deletion</h2>
       <p>
         Account data, vocabulary, and notes are retained while the account remains active.
-        Unfinished email-registration records expire automatically. Users can permanently delete
+        Unfinished email-registration records expire automatically. Session/presence records
+        (IP address, user agent, timestamps) are automatically deleted after 90 days, and are
+        also deleted immediately when an account is deleted. Users can permanently delete
         their account and associated data from <strong>Settings → Delete account</strong>.
       </p>
       <p>

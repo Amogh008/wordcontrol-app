@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import WebAudioCall from './WebAudioCall';
+import PopIn from './PopIn';
 
 function createRadarBlips() {
   const count = 4 + Math.floor(Math.random() * 4);
@@ -281,7 +282,7 @@ export default function MatchmakingModal({
       onRequestClose={match ? () => {} : close}>
 
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <PopIn visible={visible} style={styles.sheet}>
           <View style={styles.header}>
             <View>
               <Text style={styles.eyebrow}>{localize('SPEAKING NETWORK')}</Text>
@@ -467,7 +468,7 @@ export default function MatchmakingModal({
               </Pressable>
             </View>
           }
-        </View>
+        </PopIn>
       </View>
     </Modal>);
 

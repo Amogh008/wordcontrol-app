@@ -182,7 +182,7 @@ const makeStyles = (colors, compact) => StyleSheet.create({
   },
   label: {
     fontSize: compact ? 8 : 10,
-    maxWidth: compact ? 42 : 70,
+    maxWidth: compact ? 52 : 82,
     textAlign: 'center',
   },
 });

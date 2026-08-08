@@ -22,6 +22,7 @@ import { useLanguageProfile } from '../context/LanguageProfileContext';
 import { languageByCode } from '../languages';
 import { useAppDialog } from '../context/AppDialogContext';
 import NestedConfirmDialog from '../components/NestedConfirmDialog';
+import PopIn from '../components/PopIn';
 
 const titleFont = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
 
@@ -520,6 +521,7 @@ export default function WordControlScreen() {
         onRequestClose={() => confirmingWordDelete ? setConfirmingWordDelete(false) : setDetailWord(null)}>
 
         <Pressable style={styles.modalOverlay} onPress={() => {}}>
+          <PopIn visible={!!detailWord} style={styles.modalPopInWrap}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
             {detailWord ?
             <>
@@ -571,6 +573,7 @@ export default function WordControlScreen() {
               </> :
             null}
           </Pressable>
+          </PopIn>
           <NestedConfirmDialog
             visible={confirmingWordDelete && Boolean(detailWord)}
             title={localize('Delete word?')}
@@ -595,11 +598,12 @@ const makeStyles = (colors) => StyleSheet.create({
   header: {
     backgroundColor: colors.headerBg,
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 64,
     paddingBottom: 24
   },
   title: {
-    fontSize: 30
+    fontSize: 30,
+    lineHeight: 39
   },
   titleBold: {
     fontFamily: titleFont,
@@ -614,6 +618,7 @@ const makeStyles = (colors) => StyleSheet.create({
   subtitle: {
     marginTop: 6,
     fontSize: 14,
+    lineHeight: 20,
     fontWeight: '600'
   },
   dot: {
@@ -757,6 +762,11 @@ const makeStyles = (colors) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24
+  },
+  modalPopInWrap: {
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center'
   },
   modalCard: {
     backgroundColor: colors.cardBg,

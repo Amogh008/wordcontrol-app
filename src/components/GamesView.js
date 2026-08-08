@@ -14,6 +14,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { streamStory, translateText } from '../services/wordsService';
 import ReadAloudButton from './ReadAloudButton';
+import PopIn from './PopIn';
 import { useLanguageProfile } from '../context/LanguageProfileContext';
 import { languageByCode } from '../languages';
 
@@ -624,6 +625,7 @@ function StoryActivity({ words, onExit }) {
         onRequestClose={() => setShowSessionWords(false)}>
 
         <Pressable style={styles.storyModalBackdrop} onPress={() => {}}>
+          <PopIn visible={showSessionWords} style={styles.storyModalPopInWrap}>
           <Pressable style={styles.storyModalCard} onPress={(event) => event.stopPropagation()}>
             <View style={styles.wordMeaningHeader}>
               <Text style={styles.storyModalTitle}>{localize("W\xF6rter dieser Sitzung")}</Text>
@@ -646,6 +648,7 @@ function StoryActivity({ words, onExit }) {
               </Text>
             </ScrollView>
           </Pressable>
+          </PopIn>
         </Pressable>
       </Modal>
 
@@ -1827,10 +1830,16 @@ const makeStyles = (colors) => StyleSheet.create({
     padding: 22,
     backgroundColor: 'rgba(0, 0, 0, 0.78)'
   },
-  storyModalCard: {
+  storyModalPopInWrap: {
     width: '100%',
     maxWidth: 560,
     maxHeight: '78%',
+    alignItems: 'center'
+  },
+  storyModalCard: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '100%',
     padding: 20,
     borderWidth: 1,
     borderColor: colors.border,
